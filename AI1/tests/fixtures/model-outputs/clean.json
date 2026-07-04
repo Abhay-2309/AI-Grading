@@ -1,0 +1,18 @@
+{
+  "grade": "B",
+  "condition": "Good",
+  "damages": [
+    {
+      "type": "scratch",
+      "view": "back",
+      "severity": "Low",
+      "description": "Small surface scratch on the lower back panel.",
+      "confidence": 0.82,
+      "source": "visual"
+    }
+  ],
+  "imageQuality": { "score": 0.9, "notes": "All views clear and well lit." },
+  "notesContradictImages": false,
+  "summary": "Minor cosmetic wear, fully functional based on visible evidence.",
+  "confidence": 0.88
+}

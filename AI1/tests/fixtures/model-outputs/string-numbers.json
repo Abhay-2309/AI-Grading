@@ -1,0 +1,1 @@
+"{\n  \"grade\": \"B+\",\n  \"condition\": \"Good\",\n  \"damages\": [{\"type\": \"scuff\", \"view\": \"front\", \"severity\": \"Low\", \"description\": \"Light scuff.\", \"confidence\": \"0.6\", \"source\": \"visual\"}],\n  \"imageQuality\": { \"score\": \"0.85\" },\n  \"notesContradictImages\": \"FALSE\",\n  \"summary\": \"Light wear only.\",\n  \"confidence\": \"0.8\"\n}"

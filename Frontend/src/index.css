@@ -1,0 +1,462 @@
+@import "tailwindcss";
+
+@theme {
+  /* Register Spacings */
+  --spacing-base: 4px;
+  --spacing-lg: 24px;
+  --spacing-md: 16px;
+  --spacing-sm: 12px;
+  --spacing-xl: 32px;
+  --spacing-gutter: 20px;
+  --spacing-xs: 8px;
+  --spacing-container-max: 1280px;
+
+  --spacing-margin-mobile: 16px;
+  --spacing-stack-md: 16px;
+  --spacing-margin-desktop: 32px;
+  --spacing-touch-target-min: 48px;
+  --spacing-stack-sm: 8px;
+  --spacing-stack-lg: 24px;
+
+  /* Register Border Radii */
+  --border-radius-DEFAULT: 0.25rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 0.75rem;
+  --border-radius-full: 9999px;
+
+  /* Register Font Families */
+  --font-display-md: Inter, sans-serif;
+  --font-display-lg: Inter, sans-serif;
+  --font-display-lg-mobile: Inter, sans-serif;
+  --font-headline-sm: Inter, sans-serif;
+  --font-body-md: Inter, sans-serif;
+  --font-label-sm: Inter, sans-serif;
+  --font-body-lg: Inter, sans-serif;
+  --font-label-bold: Inter, sans-serif;
+
+  --font-label-md: Inter, sans-serif;
+  --font-display: Inter, sans-serif;
+  --font-headline-lg-mobile: Inter, sans-serif;
+  --font-headline-lg: Inter, sans-serif;
+  --font-headline-md: Inter, sans-serif;
+  --font-label-lg: Inter, sans-serif;
+
+  --font-body-sm: Inter, sans-serif;
+  --font-label-caps: Inter, sans-serif;
+  --font-data-mono: "JetBrains Mono", monospace;
+
+  /* Register Font Sizes, Line Heights, and Weights */
+  --text-display-md: 22px;
+  --text-display-md--line-height: 28px;
+  --text-display-md--font-weight: 700;
+
+  --text-display-lg: 28px;
+  --text-display-lg--line-height: 34px;
+  --text-display-lg--font-weight: 700;
+
+  --text-display-lg-mobile: 24px;
+  --text-display-lg-mobile--line-height: 30px;
+  --text-display-lg-mobile--font-weight: 700;
+
+  --text-headline-sm: 18px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-sm--font-weight: 700;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--font-weight: 400;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 22px;
+  --text-body-lg--font-weight: 400;
+
+  --text-label-bold: 12px;
+  --text-label-bold--line-height: 16px;
+  --text-label-bold--font-weight: 700;
+
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--font-weight: 700;
+
+  --text-display: 32px;
+  --text-display--line-height: 40px;
+  --text-display--font-weight: 700;
+
+  --text-headline-lg-mobile: 22px;
+  --text-headline-lg-mobile--line-height: 28px;
+  --text-headline-lg-mobile--font-weight: 700;
+
+  --text-headline-lg: 24px;
+  --text-headline-lg--line-height: 32px;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 600;
+
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 20px;
+  --text-label-lg--font-weight: 600;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+
+  --text-label-caps: 11px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--font-weight: 700;
+
+  --text-data-mono: 13px;
+  --text-data-mono--line-height: 16px;
+  --text-data-mono--font-weight: 500;
+
+  /* Register Color Utility Variables for Scoped Themes */
+  --color-primary-container: var(--color-primary-container);
+  --color-primary: var(--color-primary);
+  --color-on-primary-container: var(--color-on-primary-container);
+  --color-on-primary: var(--color-on-primary);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-secondary: var(--color-secondary);
+  --color-on-secondary-container: var(--color-on-secondary-container);
+  --color-on-secondary: var(--color-on-secondary);
+  --color-background: var(--color-background);
+  --color-on-background: var(--color-on-background);
+  --color-surface: var(--color-surface);
+  --color-on-surface: var(--color-on-surface);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
+  --color-error: var(--color-error);
+  --color-error-container: var(--color-error-container);
+  --color-on-error: var(--color-on-error);
+  --color-on-error-container: var(--color-on-error-container);
+  --color-tertiary-container: var(--color-tertiary-container);
+  --color-tertiary: var(--color-tertiary);
+  --color-on-tertiary: var(--color-on-tertiary);
+  --color-on-tertiary-container: var(--color-on-tertiary-container);
+  --color-primary-fixed: var(--color-primary-fixed);
+  --color-primary-fixed-dim: var(--color-primary-fixed-dim);
+  --color-on-primary-fixed: var(--color-on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--color-on-primary-fixed-variant);
+  --color-secondary-fixed: var(--color-secondary-fixed);
+  --color-secondary-fixed-dim: var(--color-secondary-fixed-dim);
+  --color-on-secondary-fixed: var(--color-on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--color-on-secondary-fixed-variant);
+  --color-tertiary-fixed: var(--color-tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--color-tertiary-fixed-dim);
+  --color-on-tertiary-fixed: var(--color-on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--color-on-tertiary-fixed-variant);
+  --color-inverse-surface: var(--color-inverse-surface);
+  --color-inverse-on-surface: var(--color-inverse-on-surface);
+  --color-inverse-primary: var(--color-inverse-primary);
+  --color-surface-bright: var(--color-surface-bright);
+  --color-surface-dim: var(--color-surface-dim);
+  --color-surface-variant: var(--color-surface-variant);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-surface-tint: var(--color-surface-tint);
+}
+
+/* Material Symbols Integration */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.camera-shutter-active:active {
+  transform: scale(0.95);
+  background-color: #e68a00;
+}
+
+.viewfinder-mask {
+  mask-image: radial-gradient(circle, transparent 70%, black 71%);
+}
+
+/* --- THEME SCOPING CONFIGURATION --- */
+
+/* 1. Customer Return Flow Theme (Light Mode) */
+.theme-customer {
+  --color-surface-container-low: #f1f4f4;
+  --color-tertiary-fixed-dim: #80d2e9;
+  --color-outline: #75777c;
+  --color-on-secondary-fixed: #2c1600;
+  --color-on-tertiary: #ffffff;
+  --color-secondary-fixed-dim: #ffb86f;
+  --color-surface-container-lowest: #ffffff;
+  --color-inverse-surface: #2d3131;
+  --color-tertiary-container: #00333d;
+  --color-inverse-primary: #bbc7db;
+  --color-outline-variant: #c5c6cc;
+  --color-surface-bright: #f7fafa;
+  --color-on-primary-fixed: #101c2b;
+  --color-surface-variant: #e0e3e3;
+  --color-on-primary-container: #8a97a9;
+  --color-on-tertiary-fixed: #001f26;
+  --color-secondary-fixed: #ffdcbd;
+  --color-primary-fixed: #d7e3f7;
+  --color-surface: #f7fafa;
+  --color-error: #ba1a1a;
+  --color-inverse-on-surface: #eef1f1;
+  --color-on-surface-variant: #44474c;
+  --color-surface-dim: #d7dbdb;
+  --color-primary-fixed-dim: #bbc7db;
+  --color-tertiary: #001d23;
+  --color-on-surface: #181c1d;
+  --color-on-primary-fixed-variant: #3c4858;
+  --color-tertiary-fixed: #adecff;
+  --color-secondary-container: #fe9800;
+  --color-on-primary: #ffffff;
+  --color-surface-container-high: #e6e9e9;
+  --color-on-secondary-fixed-variant: #693c00;
+  --color-on-secondary-container: #643900;
+  --color-on-background: #181c1d;
+  --color-secondary: #8a5100;
+  --color-surface-tint: #535f70;
+  --color-on-error: #ffffff;
+  --color-primary-container: #232f3e;
+  --color-primary: #0e1a28;
+  --color-surface-container-highest: #e0e3e3;
+  --color-on-tertiary-fixed-variant: #004e5d;
+  --color-on-tertiary-container: #4ca0b6;
+  --color-background: #EAEDED;
+  --color-surface-container: #ebeeee;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-on-secondary: #ffffff;
+
+  background-color: #EAEDED;
+}
+
+/* Amazon custom radio checked style */
+.theme-customer .amazon-radio:checked {
+  background-color: #007185;
+  border-color: #007185;
+}
+
+
+/* 2. Pickup Agent App Theme (Light-Gray Utilitarian) */
+.theme-agent {
+  --color-tertiary-fixed: #ffdead;
+  --color-secondary-fixed-dim: #b2c5ff;
+  --color-secondary-fixed: #dae2ff;
+  --color-surface-container-low: #f3f4f6;
+  --color-surface-tint: #4e5f7e;
+  --color-inverse-primary: #b6c7eb;
+  --color-on-secondary-fixed-variant: #0040a2;
+  --color-primary-fixed-dim: #b6c7eb;
+  --color-on-secondary-fixed: #001848;
+  --color-surface-container-high: #e7e8ea;
+  --color-secondary: #0453cd;
+  --color-inverse-surface: #2e3132;
+  --color-on-secondary-container: #fefcff;
+  --color-on-tertiary-fixed: #281900;
+  --color-secondary-container: #356ee7;
+  --color-tertiary-container: #3c2700;
+  --color-on-secondary: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-primary-fixed-variant: #374765;
+  --color-inverse-on-surface: #f0f1f3;
+  --color-surface-container-highest: #e1e2e4;
+  --color-on-tertiary-fixed-variant: #5b4217;
+  --color-tertiary-fixed-dim: #e5c18a;
+  --color-background: #f8f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-tertiary-container: #ad8d5b;
+  --color-surface-dim: #d9dadc;
+  --color-tertiary: #211400;
+  --color-on-error: #ffffff;
+  --color-on-surface: #191c1e;
+  --color-primary: #031632;
+  --color-on-background: #191c1e;
+  --color-on-surface-variant: #44474d;
+  --color-on-primary-fixed: #081b38;
+  --color-surface-bright: #f8f9fb;
+  --color-surface-variant: #e1e2e4;
+  --color-surface-container: #edeef0;
+  --color-surface: #f8f9fb;
+  --color-outline: #75777e;
+  --color-primary-container: #1a2b48;
+  --color-on-primary: #ffffff;
+  --color-on-tertiary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-outline-variant: #c5c6ce;
+  --color-on-primary-container: #8293b5;
+  --color-on-error-container: #93000a;
+  --color-primary-fixed: #d7e2ff;
+
+  background-color: #f8f9fb;
+}
+
+/* 3. Operations Hub Console Theme (Dark Mode) */
+.theme-hub {
+  --color-secondary-fixed: #e1e0ff;
+  --color-surface-variant: #2d3449;
+  --color-on-background: #dae2fd;
+  --color-on-tertiary-fixed: #311400;
+  --color-inverse-surface: #dae2fd;
+  --color-on-primary-fixed-variant: #004395;
+  --color-surface: #0b1326;
+  --color-inverse-primary: #005ac2;
+  --color-on-primary-container: #00285d;
+  --color-tertiary-container: #df7412;
+  --color-secondary: #c0c1ff;
+  --color-surface-container-highest: #2d3449;
+  --color-primary-container: #4d8eff;
+  --color-surface-container-high: #222a3d;
+  --color-tertiary: #ffb786;
+  --color-on-secondary: #1000a9;
+  --color-on-secondary-container: #b0b2ff;
+  --color-tertiary-fixed-dim: #ffb786;
+  --color-on-error-container: #ffdad6;
+  --color-on-tertiary: #502400;
+  --color-error-container: #93000a;
+  --color-primary-fixed-dim: #adc6ff;
+  --color-tertiary-fixed: #ffdcc6;
+  --color-on-surface: #dae2fd;
+  --color-outline-variant: #424754;
+  --color-surface-container-low: #131b2e;
+  --color-secondary-container: #3131c0;
+  --color-on-secondary-fixed-variant: #2f2ebe;
+  --color-surface-container: #171f33;
+  --color-on-tertiary-container: #461f00;
+  --color-on-secondary-fixed: #07006c;
+  --color-inverse-on-surface: #283044;
+  --color-secondary-fixed-dim: #c0c1ff;
+  --color-surface-tint: #adc6ff;
+  --color-surface-container-lowest: #060e20;
+  --color-on-primary: #002e6a;
+  --color-primary: #adc6ff;
+  --color-primary-fixed: #d8e2ff;
+  --color-outline: #8c909f;
+  --color-surface-dim: #0b1326;
+  --color-surface-bright: #31394d;
+  --color-on-error: #690005;
+  --color-on-primary-fixed: #001a42;
+  --color-background: #0b1326;
+  --color-on-tertiary-fixed-variant: #723600;
+  --color-error: #ffb4ab;
+  --color-on-surface-variant: #c2c6d6;
+
+  background-color: #020617;
+  color: #dae2fd;
+}
+
+/* Custom Scrollbar for Hub Dark Mode */
+.theme-hub ::-webkit-scrollbar { width: 6px; height: 6px; }
+.theme-hub ::-webkit-scrollbar-track { background: #0b1326; }
+.theme-hub ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.theme-hub ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+.theme-hub .zebra-row:nth-child(even) { background-color: rgba(30, 41, 59, 0.3); }
+.theme-hub .zebra-stripe:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+.theme-hub .toggle-switch:checked + .toggle-slider { background-color: #4d8eff; }
+.theme-hub .toggle-switch:checked + .toggle-slider:before { transform: translateX(14px); }
+.theme-hub .row-hover:hover { background-color: rgba(45, 52, 73, 0.4); cursor: pointer; transition: background-color 150ms ease; }
+.theme-hub .glow-border { box-shadow: 0 0 10px rgba(77, 142, 255, 0.1); }
+.theme-hub .scanline { background: linear-gradient(to bottom, transparent 50%, rgba(77, 142, 255, 0.05) 50%); background-size: 100% 4px; }
+
+/* Status Chip */
+.status-chip {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.segmented-control button {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+/* Amazon specific buttons */
+.amazon-btn-primary {
+  background: linear-gradient(to bottom, #f7dfa5, #f0c14b);
+  border: 1px solid #a88734;
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset;
+  color: #111;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.amazon-btn-primary:hover {
+  background: linear-gradient(to bottom, #f5d78e, #eeb933);
+}
+.amazon-btn-secondary {
+  background: linear-gradient(to bottom, #f7f8fa, #e7e9ec);
+  border: 1px solid #adb1b8;
+  color: #111;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.amazon-btn-secondary:hover {
+  background: linear-gradient(to bottom, #e7eaf0, #d9dce1);
+}
+.shimmer {
+  background: linear-gradient(90deg, #f0f2f2 25%, #e0e2e2 50%, #f0f2f2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Redesign overrides for Ops Console (theme-hub) */
+.theme-hub {
+  background-color: #0b1320 !important;
+  background-image: 
+    radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at center, #1b2638 0%, #080d16 100%) !important;
+  background-size: 24px 24px, 100% 100% !important;
+  background-blend-mode: normal !important;
+  position: relative;
+}
+
+.theme-hub .hub-light-container {
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-on-background: #1e293b;
+  --color-on-surface: #1e293b;
+  --color-on-surface-variant: #64748b;
+  --color-surface-container: #f8fafc;
+  --color-surface-container-low: #f1f5f9;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  --color-surface-container-lowest: #ffffff;
+  --color-outline: #94a3b8;
+  --color-outline-variant: #e2e8f0;
+  
+  --color-primary: #ff9900;
+  --color-on-primary: #111111;
+  --color-primary-container: #ffebd6;
+  --color-on-primary-container: #a35200;
+  
+  --color-secondary: #007185;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e0f2fe;
+  --color-on-secondary-container: #0369a1;
+
+  --color-tertiary: #475569;
+  --color-tertiary-container: #f1f5f9;
+  --color-on-tertiary-container: #334155;
+  
+  --color-error: #dc2626;
+  --color-error-container: #fee2e2;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #991b1b;
+
+  color: #1e293b;
+}
+
+.theme-hub .hub-light-container input[type="checkbox"] {
+  accent-color: #ff9900;
+}
+

@@ -1,0 +1,1 @@
+"{\n  \"grade\": \"B\",\n  \"condition\": \"Good\",\n  \"damages\": [{\"type\": \"scratch\", \"view\": \"back\", \"severity\": \"Low\", \"description\": \"visible mark\", \"confidence\": 0.7, \"source\": \"visual\"}],\n  \"imageQuality\": { \"score\": 0.9 },\n  \"summary\": \"Partial re"

@@ -1,0 +1,1 @@
+"```json\n{\n  \"grade\": \"A\",\n  \"condition\": \"Excellent\",\n  \"damages\": [],\n  \"imageQuality\": { \"score\": 0.95, \"notes\": \"Clear.\" },\n  \"notesContradictImages\": false,\n  \"summary\": \"Indistinguishable from new.\",\n  \"confidence\": 0.93\n}\n```"

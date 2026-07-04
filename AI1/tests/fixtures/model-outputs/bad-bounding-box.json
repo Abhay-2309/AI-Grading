@@ -1,0 +1,19 @@
+{
+  "grade": "B",
+  "condition": "Good",
+  "damages": [
+    {
+      "type": "scratch",
+      "view": "back",
+      "severity": "Low",
+      "description": "Scratch near edge.",
+      "confidence": 0.7,
+      "source": "visual",
+      "boundingBox": { "x": 0.9, "y": 0.9, "width": 0.5, "height": 0.5 }
+    }
+  ],
+  "imageQuality": { "score": 0.9 },
+  "notesContradictImages": false,
+  "summary": "Minor wear.",
+  "confidence": 0.8
+}

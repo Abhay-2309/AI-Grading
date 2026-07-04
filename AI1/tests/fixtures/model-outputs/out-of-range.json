@@ -1,0 +1,1 @@
+"{\n  \"grade\": \"A\",\n  \"condition\": \"Excellent\",\n  \"damages\": [{\"type\": \"scratch\", \"view\": \"back\", \"severity\": \"Low\", \"description\": \"Tiny mark.\", \"confidence\": 1.4, \"source\": \"visual\"}],\n  \"imageQuality\": { \"score\": 1.2 },\n  \"notesContradictImages\": false,\n  \"summary\": \"Near new.\",\n  \"confidence\": -0.1\n}"

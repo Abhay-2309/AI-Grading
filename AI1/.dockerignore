@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+scratch
+tests
+.env
+.env.*
+!.env.example
+*.log
+.git
+docker-data

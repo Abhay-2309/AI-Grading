@@ -1,0 +1,18 @@
+{
+  "grade": "A",
+  "condition": "Excellent",
+  "damages": [
+    {
+      "type": "crack",
+      "view": "front",
+      "severity": "High",
+      "description": "Large crack across the screen.",
+      "confidence": 0.95,
+      "source": "visual"
+    }
+  ],
+  "imageQuality": { "score": 0.9 },
+  "notesContradictImages": false,
+  "summary": "Looks new.",
+  "confidence": 0.9
+}
