@@ -2,6 +2,111 @@
 
 ---
 
+## 0. Complete Solution Flow — The Whole Story in One Diagram
+
+> Use this one as the "Our Solution" / "How We Solve This" slide — it's the narrative flow, not the tech stack. The detailed technical diagrams below back it up.
+
+```mermaid
+flowchart TB
+    subgraph ENTRY["Three People This Has To Work For"]
+        direction LR
+        BUY["🛍️ Shopper<br/>wants safe, honest pre-owned items"]
+        SELL["📦 Returner / Seller<br/>wants an easy return or fair resale"]
+        AMZ["🏢 Amazon<br/>wants lower cost + recovered value"]
+    end
+
+    SELL --> TRY
+
+    subgraph PREVENT["Step 0 — Prevent It Before It Happens"]
+        TRY["👗 Virtual Try-On +<br/>Shoe Size Finder"]
+        NUDGE["📊 Your Own Return-Risk<br/>shown before you buy"]
+        TRY --> NUDGE
+    end
+
+    NUDGE --> REASON
+
+    subgraph CAPTURE["Step 1 — Guided Capture"]
+        REASON["Select Return Reason"]
+        SUBCAT["Select Item Type"]
+        PHOTOS["📸 Guided Photos<br/>(exact angles, per category)"]
+        REASON --> SUBCAT --> PHOTOS
+    end
+
+    PHOTOS --> AI
+
+    subgraph GRADE["Step 2 — Instant AI Grade"]
+        AI["🤖 AI Vision Grading<br/>Gemini → Gemma fallback"]
+        CONF["Grade + Confidence Score<br/>+ Refund Estimate"]
+        AI --> CONF
+    end
+
+    CONF --> AGENT
+
+    subgraph VERIFY["Step 3 — Field Verification"]
+        AGENT["🚚 Pickup Agent<br/>checks the real item in person"]
+        MATCH{"Matches<br/>the AI?"}
+        AGENT --> MATCH
+    end
+
+    subgraph DISPUTE["Step 4 — Resolve Disagreements"]
+        HUB["🛡️ Operations Hub<br/>AI read vs Agent read, side-by-side"]
+        DECIDE["Approve / Deny / Escalate"]
+        HUB --> DECIDE
+    end
+
+    RISK["🛡️ Quiet Return-Risk Trust Score<br/>watches account patterns in background"]
+    RISK -.-> HUB
+
+    MATCH -->|Agrees| ROUTEDECISION
+    MATCH -->|Disagrees| HUB
+    DECIDE --> ROUTEDECISION
+
+    subgraph ROUTE["Step 5 — Nothing Graded Ever Just Sits There"]
+        ROUTEDECISION{"Route by Grade"}
+        RESTOCK["♻️ Restock — Like New"]
+        REFURB["🔧 Refurbish & Resell"]
+        MARKET["🛒 MarketConnect — P2P Resale"]
+        DONATE["💚 Cares Portal — NGO Donation"]
+        ROUTEDECISION --> RESTOCK
+        ROUTEDECISION --> REFURB
+        ROUTEDECISION --> MARKET
+        ROUTEDECISION --> DONATE
+    end
+
+    subgraph VALUE["Value Flows Back to Everyone"]
+        REFUND["💰 Fast, Honest Refund"]
+        CREDITS["🌱 Green Credits"]
+        SAVINGS["📉 Lower Cost + Recovered<br/>Revenue + Real Sustainability"]
+    end
+
+    DECIDE --> REFUND
+    MARKET --> CREDITS
+    DONATE --> CREDITS
+    MARKET --> BUY
+    RESTOCK --> SAVINGS
+    REFURB --> SAVINGS
+    REFUND --> SELL
+    CREDITS --> SELL
+    SAVINGS --> AMZ
+
+    style ENTRY fill:#232F3E,stroke:#FF9900,color:#fff
+    style BUY fill:#0073BB,stroke:#333,color:#fff
+    style SELL fill:#FF9900,stroke:#333,color:#000
+    style AMZ fill:#131A22,stroke:#FF9900,color:#fff
+    style AI fill:#8E24AA,stroke:#333,color:#fff
+    style HUB fill:#DD2C00,stroke:#333,color:#fff
+    style MATCH fill:#FFC107,stroke:#333,color:#000
+    style ROUTEDECISION fill:#FFC107,stroke:#333,color:#000
+    style MARKET fill:#4CAF50,stroke:#333,color:#fff
+    style DONATE fill:#2E7D32,stroke:#333,color:#fff
+    style CREDITS fill:#FFD600,stroke:#333,color:#000
+    style RISK fill:#616161,stroke:#333,color:#fff
+```
+
+**How to read it:** start top-left with the three people the whole system has to satisfy. Follow the return down through prevention, guided capture, instant AI grading, and field verification. Most items agree and go straight to routing; anything that disagrees goes to the Operations Hub first. Every item ends up somewhere useful — never landfill — and the value (refund, green credits, recovered cost) flows back up to all three people at the bottom.
+
+---
+
 ## 1. High-Level System Architecture
 
 ```mermaid
