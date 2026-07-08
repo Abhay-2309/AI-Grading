@@ -28,7 +28,7 @@ export interface ComputeGradeInput {
   detectionFailedViews?: string[];
   itemMatchesCategory?: boolean;
   visibilityIssues?: string[];
-  modelUsed?: 'gemini' | 'gemma';
+  modelUsed?: 'python' | 'gemma';
   summary?: string;
   returnReason?: string;
   conditionAnswers?: ConditionAnswers;
@@ -184,7 +184,7 @@ export function computeGrade(input: ComputeGradeInput): FinalReport {
     overallConfidence,
     requiresHumanReview: needsHumanReview,
     humanReviewReason,
-    modelUsed: input.modelUsed ?? 'gemini',
+    modelUsed: input.modelUsed ?? 'python',
     votingRuns: input.votingRuns ?? 1,
     damagesDroppedByVoting: input.damagesDroppedByVoting ?? [],
     detectionFailedViews: input.detectionFailedViews ?? [],

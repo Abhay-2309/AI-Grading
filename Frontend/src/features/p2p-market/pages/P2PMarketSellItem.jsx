@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import LocationPill from '../components/LocationPill';
+import { apiFetch } from '../../../services/api';
 
 const LISTING_FEE_CREDITS = 20;
 
@@ -36,11 +37,9 @@ export default function P2PMarketSellItem({
   onExit
 }) {
   // Wizard state
-  const [step, setStep] = useState(0); // 0: Choose Category, 1: Details, 2: Shipping, 3: Publish
+  const [step, setStep] = useState(0); // 0: Choose Category, 1: Details, 2: AI Grading, 3: Shipping
 
   // Form fields — genuinely blank so the wizard never shows example content
-  // (e.g. camera details) as if it were already filled in for whatever
-  // category the seller actually picked.
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Electronics');
   const [price, setPrice] = useState('');
@@ -55,61 +54,140 @@ export default function P2PMarketSellItem({
   const [photoError, setPhotoError] = useState('');
   const photoInputRef = useRef(null);
 
+  // AI Grading state
+  const [createdProduct, setCreatedProduct] = useState(null);
+  const [gradingPhase, setGradingPhase] = useState('idle'); // 'idle' | 'grading' | 'completed' | 'failed'
+  const [statusText, setStatusText] = useState('');
+  const [failureReason, setFailureReason] = useState('');
+  const [aiReport, setAiReport] = useState(null);
+
+  const mapGradeToCondition = (grade) => {
+    if (!grade) return 'Good';
+    const g = grade.toUpperCase();
+    if (g.startsWith('A+')) return 'New (Sealed)';
+    if (g.startsWith('A')) return 'Like New';
+    if (g.startsWith('B')) return 'Very Good';
+    if (g.startsWith('C')) return 'Good';
+    if (g.startsWith('D')) return 'Acceptable';
+    return 'Unsalvageable';
+  };
+
+  const startAiGrading = async (productId) => {
+    setGradingPhase('grading');
+    setFailureReason('');
+    setStatusText('SUBMITTING PHOTOS — 10%');
+
+    try {
+      const submitResult = await apiFetch(`/api/grading/p2p/${productId}/submit`, { method: 'POST' });
+      if (submitResult.status === 'FAILED') {
+        setFailureReason(submitResult.failureReason || 'Photo quality check failed.');
+        setGradingPhase('failed');
+        return;
+      }
+
+      setStatusText('ANALYZING — 60%');
+      let ok = false;
+      let failMsg = 'Grading is taking longer than expected.';
+      for (let i = 0; i < 72; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        const status = await apiFetch(`/api/grading/p2p/${productId}/status`);
+        setStatusText(`${status.status} — ${status.progress}%`);
+        if (status.status === 'COMPLETED') {
+          ok = true;
+          break;
+        }
+        if (status.status === 'FAILED') {
+          ok = false;
+          failMsg = status.failureReason || 'Photo grading failed.';
+          break;
+        }
+      }
+
+      if (!ok) {
+        setFailureReason(failMsg);
+        setGradingPhase('failed');
+        return;
+      }
+
+      const resultBody = await apiFetch(`/api/grading/p2p/${productId}/result`);
+      setAiReport(resultBody.report);
+      setGradingPhase('completed');
+    } catch (err) {
+      setFailureReason(err.message || 'Failed to reach the grading service.');
+      setGradingPhase('failed');
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     onNavigate('search', { query: searchQuery });
   };
 
   const handleNextStep = async () => {
-    if (step < 3) {
-      setStep(step + 1);
+    if (step === 0) {
+      setStep(1);
       return;
     }
-    if (publishing) return; // guards against a double-click firing two charges
 
-    // Publish listing — costs LISTING_FEE_CREDITS, charged server-side.
-    setPublishing(true);
-    setPublishError('');
-    const newProduct = {
-      title,
-      price: parseFloat(price) || 0,
-      originalPrice: parseFloat(price) ? parseFloat(price) * 1.2 : 0,
-      category,
-      location: userLocation?.status === 'done' ? userLocation.label : 'India',
-      lat: userLocation?.status === 'done' ? userLocation.lat : null,
-      lng: userLocation?.status === 'done' ? userLocation.lng : null,
-      sellerPhone: phone || null,
-      seller: 'Me',
-      verified: true,
-      condition: 'Like New',
-      timeAgo: 'Just now',
-      rating: 5.0,
-      reviewsCount: 0,
-      description,
-      image,
-      thumbnails: [],
-      sellerMemberSince: 'Jul 2026',
-      sellerItemsCount: 1,
-      sellerImg: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDuj-fzLZ3-qrINx7JWSoRwVRjrXGPF2nWjyfB3infTyfzgGLaO9_UWaRWKRzWzsESQUYndGvT7RTOAGxgm9SVFJ-C2Dge_bOTYn6jBeOuKpQY9raN6dIKmX3biCaqUoEw01ubhmSJPOLbEaUl0yDaWy8vV1CLnCuXjiUpK9YmSd4NItU0SqL5EatxeuA7XVn4E9CoeOGxY9ZS6X4eRhR-HEIUMlE_GZQXBNddzcEobITw64M3WSFZ13w'
-    };
+    if (step === 1) {
+      if (publishing) return;
+      setPublishing(true);
+      setPublishError('');
+      const newProduct = {
+        title,
+        price: parseFloat(price) || 0,
+        originalPrice: parseFloat(price) ? parseFloat(price) * 1.2 : 0,
+        category,
+        location: userLocation?.status === 'done' ? userLocation.label : 'India',
+        lat: userLocation?.status === 'done' ? userLocation.lat : null,
+        lng: userLocation?.status === 'done' ? userLocation.lng : null,
+        sellerPhone: phone || null,
+        seller: 'Me',
+        verified: false,
+        condition: 'Like New',
+        timeAgo: 'Just now',
+        rating: 5.0,
+        reviewsCount: 0,
+        description,
+        image,
+        thumbnails: [],
+      };
 
-    try {
-      await onAddProduct(newProduct);
+      try {
+        const created = await onAddProduct(newProduct);
+        setCreatedProduct(created);
+        setStep(2);
+        startAiGrading(created.id);
+      } catch (err) {
+        setPublishError(err.message || 'Failed to create product listing.');
+      } finally {
+        setPublishing(false);
+      }
+      return;
+    }
+
+    if (step === 2) {
+      setStep(3);
+      return;
+    }
+
+    if (step === 3) {
+      if (publishing) return;
+      setPublishing(true);
       setSuccessMsg(true);
       setTimeout(() => {
         setSuccessMsg(false);
         onNavigate('home');
+        setPublishing(false);
       }, 2000);
-    } catch (err) {
-      setPublishError(err.message || 'Failed to publish listing.');
-    } finally {
-      setPublishing(false);
     }
   };
 
   const handleBackStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
+    if (step === 3) {
+      setStep(2);
+    } else if (step === 2) {
+      setStep(1);
     } else if (step === 1) {
       setStep(0);
     }
@@ -477,9 +555,102 @@ export default function P2PMarketSellItem({
               )}
 
               {step === 2 && (
+                <div className="space-y-6 py-6 text-center">
+                  {gradingPhase === 'grading' && (
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <span className="material-symbols-outlined text-[64px] text-orange-500 animate-spin">sync</span>
+                        <h3 className="text-base font-bold text-slate-800 font-sans">AI Vision Inspection in Progress</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Our Computer Vision engine is evaluating your item for category verification and physical defects.
+                        </p>
+                      </div>
+                      <div className="max-w-xs mx-auto bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div className="bg-orange-500 h-full transition-all duration-500" style={{ width: statusText.includes('60%') ? '60%' : statusText.includes('10%') ? '10%' : '80%' }}></div>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-600">{statusText}</p>
+                    </div>
+                  )}
+
+                  {gradingPhase === 'failed' && (
+                    <div className="space-y-4 text-center">
+                      <span className="material-symbols-outlined text-[64px] text-red-500">warning</span>
+                      <h3 className="text-base font-bold text-slate-800 font-sans">Inspection Rejected</h3>
+                      <p className="text-xs font-semibold text-red-650 max-w-[384px] mx-auto bg-red-50 border border-red-200 rounded-lg p-3">
+                        {failureReason}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep(1);
+                          setGradingPhase('idle');
+                        }}
+                        className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                        Retake Photo / Change Details
+                      </button>
+                    </div>
+                  )}
+
+                  {gradingPhase === 'completed' && aiReport && (
+                    <div className="space-y-6 text-left max-w-md mx-auto">
+                      <div className="text-center space-y-2">
+                        <span className="material-symbols-outlined text-[64px] text-green-500">verified_user</span>
+                        <h3 className="text-base font-bold text-slate-800 font-sans">AI Verification Successful!</h3>
+                        <p className="text-xs text-slate-500">We have successfully verified and graded your item.</p>
+                      </div>
+
+                      <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100 space-y-3">
+                        <div className="flex justify-between items-center pb-2 border-b border-emerald-100">
+                          <span className="text-xs text-slate-600 font-semibold">Assigned Quality Grade:</span>
+                          <span className="bg-emerald-600 text-white text-xs font-extrabold px-2.5 py-0.5 rounded shadow-sm">
+                            GRADE {aiReport.grade}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pb-2 border-b border-emerald-100">
+                          <span className="text-xs text-slate-600 font-semibold">Condition Rating:</span>
+                          <span className="text-xs font-extrabold text-slate-800">{mapGradeToCondition(aiReport.grade)}</span>
+                        </div>
+
+                        {aiReport.damages && aiReport.damages.length > 0 ? (
+                          <div className="pt-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 font-sans">Detected Flaws / Damages:</span>
+                            <ul className="list-disc list-inside text-xs text-slate-650 space-y-1">
+                              {aiReport.damages.map((d, idx) => (
+                                <li key={idx}>
+                                  <span className="font-bold text-slate-800">{d.defect_type || d.type}</span>: {d.description || d.desc}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-emerald-700 font-bold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[16px] text-emerald-650">check_circle</span>
+                            No physical defects detected! Perfect condition.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setStep(3)}
+                          className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow"
+                        >
+                          Continue to Shipping
+                          <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 3 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-slate-800">Choose Shipping & Meetup Options</h3>
+                    <h3 className="text-sm font-bold text-slate-800 font-sans">Choose Shipping & Meetup Options</h3>
                     <p className="text-xs text-slate-500">Enable how you prefer buyers to receive your item. We recommend enabling both for maximum coverage.</p>
                   </div>
 
@@ -527,24 +698,17 @@ export default function P2PMarketSellItem({
                         : 'Use my current location'}
                     </button>
                   </div>
-                </div>
-              )}
 
-              {step === 3 && (
-                <div className="space-y-6 text-center py-6">
-                  <span className="material-symbols-outlined text-[64px] text-orange-500" style={{ fontVariationSettings: "'FILL' 0" }}>task_alt</span>
-                  <h3 className="text-base font-bold text-slate-800">Ready to Publish</h3>
-                  <p className="text-xs text-slate-500 max-w-[384px] mx-auto">
-                    Your listing is complete and ready to go live in the India peer-to-peer connection pool. Verify detail accuracy in the Live Preview card.
-                  </p>
-                  <div className="max-w-[384px] mx-auto bg-orange-50 border border-orange-200 rounded-lg p-3 text-left flex items-center justify-between">
-                    <span className="text-xs font-bold text-orange-800">Listing fee</span>
-                    <span className="text-sm font-black text-orange-600">{LISTING_FEE_CREDITS} Green Credits</span>
+                  <div className="pt-4 border-t border-slate-100 space-y-4">
+                    <div className="max-w-[384px] mx-auto bg-orange-50 border border-orange-200 rounded-lg p-3 text-left flex items-center justify-between">
+                      <span className="text-xs font-bold text-orange-800">Listing fee</span>
+                      <span className="text-sm font-black text-orange-600">{LISTING_FEE_CREDITS} Green Credits</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">Your balance: <strong>{greenCredits}</strong> Green Credits</p>
+                    {publishError && (
+                      <p className="max-w-[384px] mx-auto text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{publishError}</p>
+                    )}
                   </div>
-                  <p className="text-[11px] text-slate-500">Your balance: <strong>{greenCredits}</strong> Green Credits</p>
-                  {publishError && (
-                    <p className="max-w-[384px] mx-auto text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{publishError}</p>
-                  )}
                 </div>
               )}
 
@@ -553,18 +717,21 @@ export default function P2PMarketSellItem({
                 <button 
                   type="button"
                   onClick={handleBackStep}
-                  className="px-5 py-2 border border-slate-300 rounded-lg font-bold text-xs text-slate-650 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer"
+                  disabled={step === 0 || (step === 2 && gradingPhase === 'grading')}
+                  className="px-5 py-2 border border-slate-300 rounded-lg font-bold text-xs text-slate-650 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer disabled:opacity-50"
                 >
                   Back
                 </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={publishing || (step === 1 && !canProceedFromDetails)}
-                  className="px-6 py-2 bg-orange-500 text-white rounded-lg font-bold text-xs hover:bg-orange-600 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {step === 3 ? (publishing ? 'Publishing...' : `Publish Listing (${LISTING_FEE_CREDITS} credits)`) : 'Next Step'}
-                </button>
+                {step !== 2 && (
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    disabled={publishing || (step === 1 && !canProceedFromDetails)}
+                    className="px-6 py-2 bg-orange-500 text-white rounded-lg font-bold text-xs hover:bg-orange-600 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {step === 3 ? (publishing ? 'Publishing...' : `Publish Listing (${LISTING_FEE_CREDITS} credits)`) : 'Next Step'}
+                  </button>
+                )}
               </div>
             </section>
 

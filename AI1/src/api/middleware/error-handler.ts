@@ -1,8 +1,24 @@
 import type { FastifyInstance, FastifyError } from 'fastify';
-import { isAppError } from '../../utils/errors.js';
+import { isAppError, isFraudBlockError } from '../../utils/errors.js';
 
 export function setupErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((err: FastifyError | Error, request, reply) => {
+    // ── Fraud Firewall blocks ─────────────────────────────────────────────
+    // Return the standardised fraud response envelope instead of the
+    // generic AppError envelope so the caller can distinguish a security
+    // rejection from a validation failure.
+    if (isFraudBlockError(err)) {
+      request.log.warn(
+        { reason: err.fraudReason, ip: request.headers['x-forwarded-for'] ?? request.ip },
+        'request blocked by fraud firewall'
+      );
+      reply.status(err.statusCode).send({
+        status: 'FRAUD_FLAG',
+        reason: err.fraudReason,
+      });
+      return;
+    }
+
     if (isAppError(err)) {
       request.log.warn({ err, code: err.code }, 'request failed with AppError');
       reply.status(err.statusCode).send({

@@ -8,7 +8,7 @@ import type { SingleViewDetectionInput, VisionGrader } from './clients/types.js'
 
 export interface SingleViewOrchestrationResult {
   result: DetectionResult;
-  modelUsed: 'gemini' | 'gemma';
+  modelUsed: 'python' | 'gemma';
   view: string;
 }
 
@@ -74,7 +74,7 @@ export class FallbackOrchestrator {
 
   constructor(
     private readonly primary: VisionGrader,
-    private readonly fallback: VisionGrader,
+    private readonly fallback?: VisionGrader,
     breaker?: CircuitBreaker
   ) {
     this.breaker =
@@ -100,21 +100,31 @@ export class FallbackOrchestrator {
           err instanceof ModelOutputError
         ) {
           this.breaker.recordFailure();
-          log.warn({ event: 'primaryModelFailed', model: this.primary.name, err: String(err) }, 'falling back');
+          log.warn({ event: 'primaryModelFailed', model: this.primary.name, err: String(err) }, 'primary failed');
+          if (!this.fallback) {
+            throw err;
+          }
         } else {
           throw err;
         }
       }
     } else {
       log.warn({ event: 'circuitBreakerOpen', model: this.primary.name }, 'skipping primary, breaker open');
+      if (!this.fallback) {
+        throw new ModelUnavailableError(`Circuit breaker is open for ${this.primary.name} service.`);
+      }
     }
 
-    try {
-      const result = await detectSingleViewWithInternalRetry(this.fallback, input, 1);
-      return { result, modelUsed: this.fallback.name, view: input.image.view };
-    } catch (err) {
-      log.error({ event: 'fallbackModelFailed', model: this.fallback.name, err: String(err) }, 'both models failed');
-      throw err;
+    if (this.fallback) {
+      try {
+        const result = await detectSingleViewWithInternalRetry(this.fallback, input, 1);
+        return { result, modelUsed: this.fallback.name, view: input.image.view };
+      } catch (err) {
+        log.error({ event: 'fallbackModelFailed', model: this.fallback.name, err: String(err) }, 'both models failed');
+        throw err;
+      }
     }
+
+    throw new ModelUnavailableError(`Service ${this.primary.name} is currently unavailable.`);
   }
 }

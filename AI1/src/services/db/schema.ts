@@ -48,8 +48,15 @@ export interface GradingRequestRecord {
   failureReason?: string;
   failureCode?: string;
 
-  modelUsed?: 'gemini' | 'gemma';
+  modelUsed?: 'python' | 'gemma';
   finalReport?: FinalReport;
+
+  /**
+   * Security signals appended by the fraud-firewall middleware.
+   * Written by grade.controller after DynamoDB record creation.
+   * Example values: ['High_Risk_Geo']
+   */
+  securityFlags?: string[];
 
   createdAt: string;
   updatedAt: string;

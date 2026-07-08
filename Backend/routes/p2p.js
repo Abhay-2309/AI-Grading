@@ -31,6 +31,9 @@ function mapProduct(p) {
     image: p.image,
     thumbnails: p.thumbnails ?? [],
     timeAgo: p.timeAgo ?? 'Recently',
+    aiStatus: p.aiStatus,
+    grade: p.grade,
+    defects: p.defects ?? [],
   };
 }
 
@@ -67,15 +70,24 @@ function mapMessage(m) {
 router.get('/products', async (req, res) => {
   try {
     const { category, q } = req.query;
-    const where = {};
+    const where = {
+      OR: [
+        { aiStatus: 'COMPLETED' },
+        { aiStatus: null },
+      ]
+    };
 
     if (category && category !== 'All') {
       where.category = { equals: category, mode: 'insensitive' };
     }
     if (q) {
-      where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
+      where.AND = [
+        {
+          OR: [
+            { title: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
+          ]
+        }
       ];
     }
 
@@ -145,6 +157,7 @@ router.post('/products', async (req, res) => {
           image: image ?? null,
           thumbnails: thumbnails ?? [],
           timeAgo: timeAgo ?? 'Just now',
+          aiStatus: 'Pending',
         },
       }),
       prisma.profile.update({

@@ -408,10 +408,17 @@ export default function P2PMarketSearchResults({
                           src={product.image}
                         />
                         {product.verified && (
-                          <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
-                            Verified
-                          </div>
-                        )}
+                           <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                             <div className="bg-orange-500 text-white px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
+                               Verified
+                             </div>
+                             {product.grade && (
+                               <div className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">
+                                 Grade {product.grade}
+                               </div>
+                             )}
+                           </div>
+                         )}
                       </div>
                       <div className="p-3.5 space-y-1.5 flex-grow flex flex-col justify-between text-left">
                         <div>

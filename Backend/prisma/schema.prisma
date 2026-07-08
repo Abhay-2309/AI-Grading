@@ -21,6 +21,7 @@ model Profile {
   treesPlanted    Int               @default(14) @map("trees_planted")
   causesHelped    Int               @default(8) @map("causes_helped")
   totalOrdersPlaced Int             @default(0) @map("total_orders_placed")
+  isBanned        Boolean           @default(false) @map("is_banned")
   createdAt       DateTime          @default(now()) @map("created_at")
 
   returns         Return[]
@@ -85,6 +86,8 @@ model Return {
   conditionAnswers  Json      @default("{}") @map("condition_answers")
   aiNotesContradict Boolean   @default(false) @map("ai_notes_contradict")
   aiRequiresHumanReview Boolean @default(false) @map("ai_requires_human_review")
+  refundStatus      String    @default("PENDING") @map("refund_status")
+  fraudFlagReason   String?   @map("fraud_flag_reason")
   createdAt         DateTime  @default(now()) @map("created_at")
 
   customer          Profile?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -118,6 +121,10 @@ model P2pProduct {
   lat              Float?
   lng              Float?
   sellerPhone      String?   @map("seller_phone")
+  aiRequestId      String?   @map("ai_request_id")
+  aiStatus         String?   @map("ai_status")
+  grade            String?
+  defects          Json      @default("[]")
   createdAt        DateTime  @default(now()) @map("created_at")
 
   seller           Profile?  @relation(fields: [sellerId], references: [id], onDelete: SetNull)

@@ -32,6 +32,7 @@ const INITIAL_RETURN_STATE = {
   aiReport: null,
   assessmentComplete: false,
   method: 'dropoff', // 'dropoff', 'ups'
+  mockIp: null,
 };
 
 export function useGlobalState() {
@@ -92,10 +93,10 @@ export function useGlobalState() {
   // would clobber it.
   const submitUserReturn = useCallback(() => {
     setCurrentReturnState((state) => {
-      const { itemId, reason, comments, subcategory, conditionAnswers } = state;
+      const { itemId, reason, comments, subcategory, conditionAnswers, mockIp } = state;
       apiFetch('/api/returns/submit', {
         method: 'POST',
-        body: json({ itemId, reason, comments, subcategory, conditionAnswers }),
+        body: json({ itemId, reason, comments, subcategory, conditionAnswers, mockIp }),
       })
         .then((updated) => setReturns((prev) => prev.map((item) => (item.id === itemId ? updated : item))))
         .catch((err) => console.error('Failed to submit return:', err));

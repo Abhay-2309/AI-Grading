@@ -297,6 +297,43 @@ export default function P2PMarketProductDetail({
                 <p className="text-xs text-slate-600 leading-relaxed">{product.description}</p>
               </div>
 
+              {product.grade && (
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5 text-emerald-700 font-sans">
+                    <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                    AI Grading Report & Assessment
+                  </h3>
+                  <div className="bg-emerald-50/50 rounded-xl p-3.5 border border-emerald-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] text-slate-500 font-semibold">Assessed Quality Grade:</span>
+                      <span className="bg-emerald-600 text-white text-xs font-extrabold px-2.5 py-0.5 rounded shadow-sm">
+                        GRADE {product.grade}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] text-slate-500 font-semibold">Reported Condition:</span>
+                      <span className="text-xs font-bold text-slate-700">{product.condition}</span>
+                    </div>
+                    {product.defects && product.defects.length > 0 ? (
+                      <div className="pt-2 border-t border-emerald-100 mt-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Detected Defects:</span>
+                        <ul className="list-disc list-inside text-[11px] text-slate-650 space-y-1">
+                          {product.defects.map((def, idx) => (
+                            <li key={idx}>
+                              <span className="font-bold text-slate-700">{def.defect_type || def.type}</span>: {def.description || def.desc}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="pt-2 border-t border-emerald-100 mt-2 text-[10px] text-emerald-700 font-medium">
+                        ✓ No structural or visual defects detected by AI analysis.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Seller Info Card */}
               <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-4">
                 <div className="flex items-center justify-between">

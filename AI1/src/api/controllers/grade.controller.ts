@@ -48,7 +48,11 @@ export async function gradeHandler(
 
   const requestId = uuidv4();
   const now = new Date().toISOString();
-  await gradingRepository.create(metadataToRecord(requestId, metadata, now));
+  const record = metadataToRecord(requestId, metadata, now);
+  if (request.geoRisk) {
+    record.securityFlags = [request.geoRisk];
+  }
+  await gradingRepository.create(record);
   await this.intakeService.recordIdempotencyKey(metadata.idempotencyKey, requestId);
 
   const { reports: qualityReports } = await assessBatchQuality(

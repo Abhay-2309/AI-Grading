@@ -4,7 +4,7 @@ import { CircuitBreaker } from '../../../src/services/ai/circuitBreaker.js';
 import { ModelQuotaError, ModelUnavailableError } from '../../../src/utils/errors.js';
 import type { SingleViewDetectionInput, RawModelResponse, VisionGrader } from '../../../src/services/ai/clients/types.js';
 
-function cleanResponse(modelUsed: 'gemini' | 'gemma'): RawModelResponse {
+function cleanResponse(modelUsed: 'python' | 'gemma'): RawModelResponse {
   return {
     modelUsed,
     text: JSON.stringify({
@@ -16,7 +16,7 @@ function cleanResponse(modelUsed: 'gemini' | 'gemma'): RawModelResponse {
   };
 }
 
-function fencedResponse(modelUsed: 'gemini' | 'gemma'): RawModelResponse {
+function fencedResponse(modelUsed: 'python' | 'gemma'): RawModelResponse {
   return { modelUsed, text: '```json\n' + cleanResponse(modelUsed).text + '\n```' };
 }
 
@@ -33,7 +33,7 @@ function baseSingleViewInput(): SingleViewDetectionInput {
 class FakeGrader implements VisionGrader {
   callCount = 0;
   constructor(
-    public readonly name: 'gemini' | 'gemma',
+    public readonly name: 'python' | 'gemma',
     private readonly behavior: (call: number) => Promise<RawModelResponse>
   ) {}
   async detectSingleView(): Promise<RawModelResponse> {
@@ -44,91 +44,91 @@ class FakeGrader implements VisionGrader {
 
 describe('FallbackOrchestrator', () => {
   it('returns the primary model result on a clean first response', async () => {
-    const gemini = new FakeGrader('gemini', async () => cleanResponse('gemini'));
+    const python = new FakeGrader('python', async () => cleanResponse('python'));
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma);
+    const orch = new FallbackOrchestrator(python, gemma);
 
     const result = await orch.detectSingleView(baseSingleViewInput());
-    expect(result.modelUsed).toBe('gemini');
+    expect(result.modelUsed).toBe('python');
     expect(gemma.callCount).toBe(0);
   });
 
   it('repairs fenced JSON without falling back to the secondary model', async () => {
-    const gemini = new FakeGrader('gemini', async () => fencedResponse('gemini'));
+    const python = new FakeGrader('python', async () => fencedResponse('python'));
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma);
+    const orch = new FallbackOrchestrator(python, gemma);
 
     const result = await orch.detectSingleView(baseSingleViewInput());
-    expect(result.modelUsed).toBe('gemini');
+    expect(result.modelUsed).toBe('python');
     expect(gemma.callCount).toBe(0);
   });
 
-  it('falls back to gemma when gemini returns truncated JSON on both attempts', async () => {
-    const gemini = new FakeGrader('gemini', async () => ({ modelUsed: 'gemini', text: '{"damages": [' }));
+  it('falls back to gemma when python returns truncated JSON on both attempts', async () => {
+    const python = new FakeGrader('python', async () => ({ modelUsed: 'python', text: '{"damages": [' }));
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma);
+    const orch = new FallbackOrchestrator(python, gemma);
 
     const result = await orch.detectSingleView(baseSingleViewInput());
     expect(result.modelUsed).toBe('gemma');
   });
 
-  it('falls back to gemma on a 429 quota error from gemini', async () => {
-    const gemini = new FakeGrader('gemini', async () => {
+  it('falls back to gemma on a 429 quota error from python', async () => {
+    const python = new FakeGrader('python', async () => {
       throw new ModelQuotaError('quota exceeded');
     });
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma);
+    const orch = new FallbackOrchestrator(python, gemma);
 
     const result = await orch.detectSingleView(baseSingleViewInput());
     expect(result.modelUsed).toBe('gemma');
   });
 
-  it('falls back to gemma when gemini times out', async () => {
-    const gemini = new FakeGrader('gemini', async () => {
+  it('falls back to gemma when python times out', async () => {
+    const python = new FakeGrader('python', async () => {
       throw new ModelUnavailableError('timed out');
     });
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma, new CircuitBreaker(999, 999999));
+    const orch = new FallbackOrchestrator(python, gemma, new CircuitBreaker(999, 999999));
 
     const result = await orch.detectSingleView(baseSingleViewInput());
     expect(result.modelUsed).toBe('gemma');
   });
 
   it('throws when both models fail', async () => {
-    const gemini = new FakeGrader('gemini', async () => {
-      throw new ModelUnavailableError('gemini down');
+    const python = new FakeGrader('python', async () => {
+      throw new ModelUnavailableError('python down');
     });
     const gemma = new FakeGrader('gemma', async () => {
       throw new ModelUnavailableError('gemma down');
     });
-    const orch = new FallbackOrchestrator(gemini, gemma, new CircuitBreaker(999, 999999));
+    const orch = new FallbackOrchestrator(python, gemma, new CircuitBreaker(999, 999999));
 
     await expect(orch.detectSingleView(baseSingleViewInput())).rejects.toThrow();
   });
 
   it('opens the circuit after consecutive failures and skips the primary entirely', async () => {
-    const gemini = new FakeGrader('gemini', async () => {
-      throw new ModelUnavailableError('gemini down');
+    const python = new FakeGrader('python', async () => {
+      throw new ModelUnavailableError('python down');
     });
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
     const breaker = new CircuitBreaker(2, 60000);
-    const orch = new FallbackOrchestrator(gemini, gemma, breaker);
+    const orch = new FallbackOrchestrator(python, gemma, breaker);
 
     await orch.detectSingleView(baseSingleViewInput()); // failure 1
     await orch.detectSingleView(baseSingleViewInput()); // failure 2 -> breaker opens
     expect(breaker.state).toBe('open');
 
-    const callsBeforeSkip = gemini.callCount;
-    await orch.detectSingleView(baseSingleViewInput()); // should skip gemini entirely
-    expect(gemini.callCount).toBe(callsBeforeSkip); // unchanged — primary was skipped
+    const callsBeforeSkip = python.callCount;
+    await orch.detectSingleView(baseSingleViewInput()); // should skip python entirely
+    expect(python.callCount).toBe(callsBeforeSkip); // unchanged — primary was skipped
   });
 
   it('does not fall back on non-model errors from programming bugs', async () => {
-    const gemini = new FakeGrader('gemini', async () => {
+    const python = new FakeGrader('python', async () => {
       throw new Error('unexpected programming error, not a model error');
     });
     const gemma = new FakeGrader('gemma', async () => cleanResponse('gemma'));
-    const orch = new FallbackOrchestrator(gemini, gemma);
+    const orch = new FallbackOrchestrator(python, gemma);
 
     await expect(orch.detectSingleView(baseSingleViewInput())).rejects.toThrow(/programming error/);
     expect(gemma.callCount).toBe(0);

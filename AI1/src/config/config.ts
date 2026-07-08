@@ -12,6 +12,10 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
 
+  // Fraud Firewall: IP-level velocity limits (separate from the per-customer limiter)
+  FRAUD_IP_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(3),
+  FRAUD_IP_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(900),
+
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
@@ -21,11 +25,10 @@ const envSchema = z.object({
   DYNAMODB_ENDPOINT: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(false),
 
-  GEMINI_API_KEY: z.string().min(1),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  PYTHON_AI_ENGINE_URL: z.string().default('http://127.0.0.1:8000'),
   GEMMA_API_KEY: z.string().min(1),
   GEMMA_MODEL: z.string().default('gemma-3-27b-it'),
-  MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(55000),
+  MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(100000),
 
   CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
   CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(120000),

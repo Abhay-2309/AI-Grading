@@ -22,10 +22,10 @@ export interface SingleViewDetectionInput {
 
 export interface RawModelResponse {
   text: string;
-  modelUsed: 'gemini' | 'gemma';
+  modelUsed: 'python' | 'gemma';
 }
 
 export interface VisionGrader {
-  readonly name: 'gemini' | 'gemma';
+  readonly name: 'python' | 'gemma';
   detectSingleView(input: SingleViewDetectionInput): Promise<RawModelResponse>;
 }

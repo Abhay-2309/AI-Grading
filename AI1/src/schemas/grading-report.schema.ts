@@ -44,6 +44,7 @@ export type Damage = DetectedDamage;
 export const detectionResultSchema = z.object({
   damages: z.array(detectedDamageSchema),
   itemMatchesCategory: z.boolean().default(true),
+  categoryMismatchReason: z.string().optional(),
   visibilityIssues: z.array(z.string()).default([]),
   imageQualityScore: z.number().min(0).max(1).default(0.9),
 });

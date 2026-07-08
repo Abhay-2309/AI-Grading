@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import multipart from '@fastify/multipart';
 import { config } from './config/config.js';
 import { requestIdMiddleware } from './api/middleware/request-id.js';
+import { fraudFirewallPlugin } from './api/middleware/fraud-firewall.js';
 import { setupErrorHandler } from './api/middleware/error-handler.js';
 import { gradeRoutes } from './api/routes/grade.route.js';
 import { qualityCheckRoutes } from './api/routes/quality-check.route.js';
@@ -40,6 +41,10 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   });
 
   await app.register(requestIdMiddleware);
+  // Fraud Firewall must be registered after requestIdMiddleware (so request.log
+  // is already enriched with a requestId) but BEFORE routes so the onRequest
+  // hook fires before any route handler or multipart body parsing.
+  await app.register(fraudFirewallPlugin);
   setupErrorHandler(app);
 
   const store = opts.idempotencyStore ?? new InMemoryIdempotencyStore();

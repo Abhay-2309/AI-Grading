@@ -357,10 +357,15 @@ export default function P2PMarketHome({
                       src={product.image}
                     />
                     {product.verified && (
-                      <div className="absolute top-2 left-2 flex gap-1">
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                         <span className="bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
                           VERIFIED
                         </span>
+                        {product.grade && (
+                          <span className="bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                            GRADE {product.grade}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

@@ -8,7 +8,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const AI1_BASE_URL = (process.env.AI1_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
 
-// Backend's Return.category values -> AI1's lowercase grading-category enum.
+// Backend's Return.category / P2pProduct.category values -> AI1's lowercase grading-category enum.
 // Used only when there's no subcategory (or no taxonomy entry) to look up.
 const CATEGORY_MAP = {
   ELECTRONICS: 'electronics',
@@ -18,6 +18,11 @@ const CATEGORY_MAP = {
   HOME: 'home',
   TOYS: 'toys',
   SPORTS: 'sports',
+  PHOTOGRAPHY: 'electronics',
+  FASHION: 'apparel',
+  'HOME & FURNITURE': 'home',
+  'SPORTS & OUTDOORS': 'sports',
+  'BOOKS & HOBBIES': 'books',
 };
 
 function findSubcategoryLeaf(category, subcategory) {
@@ -176,6 +181,7 @@ router.get('/:returnId/result', async (req, res) => {
 
     if (aiResponse.ok && aiBody.status === 'COMPLETED' && aiBody.report) {
       const { report } = aiBody;
+      const isMismatch = report.itemMatchesCategory === false || report.mismatchFlag === true;
       await prisma.return.update({
         where: { id: returnId },
         data: {
@@ -187,7 +193,11 @@ router.get('/:returnId/result', async (req, res) => {
           // pickup-agent full-checklist verification needs the rest.
           defects: report.damages,
           aiNotesContradict: report.notesContradictImages ?? false,
-          aiRequiresHumanReview: report.requiresHumanReview ?? false,
+          aiRequiresHumanReview: (report.requiresHumanReview ?? false) || isMismatch,
+          ...(isMismatch && {
+            refundStatus: 'HELD_FOR_REVIEW',
+            fraudFlagReason: 'Category Mismatch detected by Moondream VLM'
+          })
         },
       });
     } else if (aiResponse.ok && aiBody.status === 'FAILED') {
@@ -200,6 +210,165 @@ router.get('/:returnId/result', async (req, res) => {
     res.status(aiResponse.status).json(aiBody);
   } catch (err) {
     console.error('GET /grading/:returnId/result error:', err);
+    res.status(502).json({ error: 'Failed to reach AI grading service', details: err.message });
+  }
+});
+
+const REQUIRED_VIEWS = {
+  electronics: ['front', 'back', 'left', 'right', 'top', 'bottom'],
+  books: ['front', 'back'],
+  apparel: ['front', 'back'],
+  home: ['front', 'back', 'left', 'right', 'top', 'bottom'],
+  toys: ['front', 'back', 'left', 'right', 'top', 'bottom'],
+  sports: ['front', 'back', 'left', 'right', 'top', 'bottom'],
+  other: ['front', 'back', 'left', 'right', 'top', 'bottom'],
+};
+
+function mapGradeToCondition(grade) {
+  if (!grade) return 'Good';
+  const g = grade.toUpperCase();
+  if (g.startsWith('A+')) return 'New (Sealed)';
+  if (g.startsWith('A')) return 'Like New';
+  if (g.startsWith('B')) return 'Very Good';
+  if (g.startsWith('C')) return 'Good';
+  if (g.startsWith('D')) return 'Acceptable';
+  return 'Unsalvageable';
+}
+
+async function getImageBufferAndMimetype(imageStr) {
+  if (!imageStr) return null;
+  if (imageStr.startsWith('data:')) {
+    const matches = imageStr.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      return {
+        mimeType: matches[1],
+        buffer: Buffer.from(matches[2], 'base64'),
+      };
+    }
+  } else if (imageStr.startsWith('http://') || imageStr.startsWith('https://')) {
+    const res = await fetch(imageStr);
+    if (res.ok) {
+      const arrayBuffer = await res.arrayBuffer();
+      return {
+        mimeType: res.headers.get('content-type') || 'image/jpeg',
+        buffer: Buffer.from(arrayBuffer),
+      };
+    }
+  }
+  return null;
+}
+
+// POST /api/grading/p2p/:productId/submit — forwards listing photo + metadata to AI1's /grade
+router.post('/p2p/:productId/submit', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const existing = await prisma.p2pProduct.findUnique({ where: { id: productId } });
+    if (!existing) return res.status(404).json({ error: 'Product not found' });
+
+    const imgData = await getImageBufferAndMimetype(existing.image);
+    if (!imgData) return res.status(400).json({ error: 'No valid image on file for this listing' });
+
+    // Determine target category for AI1
+    const aiCategory = mapCategory(existing.category, null);
+
+    // Look up required views for this category
+    const required = REQUIRED_VIEWS[aiCategory] || ['front', 'back'];
+
+    const form = new FormData();
+    // Re-use the single uploaded photo buffer for all required views of this category
+    for (const view of required) {
+      form.append(view, new Blob([imgData.buffer], { type: imgData.mimeType }), `image_${view}.jpg`);
+    }
+
+    form.append('customerId', `p2p_${productId}`);
+    form.append('category', aiCategory);
+    form.append('returnReason', 'P2P Sale');
+    form.append('customerNotes', existing.description || 'P2P Listing');
+
+    const aiResponse = await fetch(`${AI1_BASE_URL}/grade`, { method: 'POST', body: form });
+    const aiBody = await aiResponse.json();
+
+    if (!aiResponse.ok) {
+      return res.status(aiResponse.status).json(aiBody);
+    }
+
+    await prisma.p2pProduct.update({
+      where: { id: productId },
+      data: {
+        aiRequestId: aiBody.requestId,
+        aiStatus: aiBody.status,
+      },
+    });
+
+    res.status(aiResponse.status).json(aiBody);
+  } catch (err) {
+    console.error('POST /grading/p2p/:productId/submit error:', err);
+    res.status(502).json({ error: 'Failed to reach AI grading service', details: err.message });
+  }
+});
+
+// GET /api/grading/p2p/:productId/status — proxies AI1's GET /status/:id
+router.get('/p2p/:productId/status', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const existing = await prisma.p2pProduct.findUnique({ where: { id: productId } });
+    if (!existing) return res.status(404).json({ error: 'Product not found' });
+    if (!existing.aiRequestId) {
+      return res.status(404).json({ error: 'No grading request in progress for this product' });
+    }
+
+    const aiResponse = await fetch(`${AI1_BASE_URL}/status/${existing.aiRequestId}`);
+    const aiBody = await aiResponse.json();
+
+    if (aiResponse.ok && aiBody.status && aiBody.status !== existing.aiStatus) {
+      await prisma.p2pProduct.update({
+        where: { id: productId },
+        data: { aiStatus: aiBody.status },
+      });
+    }
+
+    res.status(aiResponse.status).json(aiBody);
+  } catch (err) {
+    console.error('GET /grading/p2p/:productId/status error:', err);
+    res.status(502).json({ error: 'Failed to reach AI grading service', details: err.message });
+  }
+});
+
+// GET /api/grading/p2p/:productId/result — proxies AI1's GET /result/:id and, on COMPLETED, updates product row
+router.get('/p2p/:productId/result', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const existing = await prisma.p2pProduct.findUnique({ where: { id: productId } });
+    if (!existing) return res.status(404).json({ error: 'Product not found' });
+    if (!existing.aiRequestId) {
+      return res.status(404).json({ error: 'No grading request in progress for this product' });
+    }
+
+    const aiResponse = await fetch(`${AI1_BASE_URL}/result/${existing.aiRequestId}`);
+    const aiBody = await aiResponse.json();
+
+    if (aiResponse.ok && aiBody.status === 'COMPLETED' && aiBody.report) {
+      const { report } = aiBody;
+      await prisma.p2pProduct.update({
+        where: { id: productId },
+        data: {
+          aiStatus: 'COMPLETED',
+          verified: true,
+          grade: report.grade,
+          condition: mapGradeToCondition(report.grade),
+          defects: report.damages || [],
+        },
+      });
+    } else if (aiResponse.ok && aiBody.status === 'FAILED') {
+      await prisma.p2pProduct.update({
+        where: { id: productId },
+        data: { aiStatus: 'FAILED' },
+      });
+    }
+
+    res.status(aiResponse.status).json(aiBody);
+  } catch (err) {
+    console.error('GET /grading/p2p/:productId/result error:', err);
     res.status(502).json({ error: 'Failed to reach AI grading service', details: err.message });
   }
 });

@@ -8,7 +8,7 @@ export { computeGrade, mapScoreToProvisionalGrade, mapGradeToCondition } from '.
 export function applyGradingRules(
   report: DetectionResult,
   notes: NotesAnalysis,
-  modelUsed: 'gemini' | 'gemma',
+  modelUsed: 'python' | 'gemma',
   _requestId?: string
 ): FinalReport {
   return computeGrade({

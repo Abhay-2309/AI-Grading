@@ -9,6 +9,8 @@ import profileRouter from './routes/profile.js';
 import gradingRouter from './routes/grading.js';
 import configRouter from './routes/config.js';
 import tryonRouter from './routes/tryon.js';
+import adminRouter from './routes/admin.js';
+import { checkBanStatus } from './utils/checkBanStatus.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL, 'http://localhost:5173'] : '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id'],
 }));
 app.use(express.json());
 
@@ -27,13 +29,17 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/returns', returnsRouter);
+// checkBanStatus is applied on the two routes that are user-facing and allow
+// new actions: returns submission and photo grading.  Admin routes are exempt
+// by design (admins resolve bans; they cannot be banned themselves here).
+app.use('/api/returns', checkBanStatus, returnsRouter);
 app.use('/api/p2p', p2pRouter);
 app.use('/api/donations', donationsRouter);
 app.use('/api/profile', profileRouter);
-app.use('/api/grading', gradingRouter);
+app.use('/api/grading', checkBanStatus, gradingRouter);
 app.use('/api/config', configRouter);
 app.use('/api/tryon', tryonRouter);
+app.use('/api/admin', adminRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -54,5 +60,6 @@ app.listen(PORT, () => {
   console.log(`💚 Donations:   http://localhost:${PORT}/api/donations/campaigns`);
   console.log(`👤 Profile:     http://localhost:${PORT}/api/profile`);
   console.log(`🤖 Grading:     http://localhost:${PORT}/api/grading`);
-  console.log(`👗 Try-On:      http://localhost:${PORT}/api/tryon\n`);
+  console.log(`👗 Try-On:      http://localhost:${PORT}/api/tryon`);
+  console.log(`🛡️  Admin:       http://localhost:${PORT}/api/admin\n`);
 });

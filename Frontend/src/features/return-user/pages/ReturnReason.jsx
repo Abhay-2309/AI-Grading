@@ -123,6 +123,25 @@ export default function ReturnReason({ activeReturn, returnState, setReturnState
             </div>
           )}
 
+          {/* Risk Simulation Toggle */}
+          <div className="mt-xl p-md bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-md">
+            <input
+              type="checkbox"
+              id="simulateRiskIp"
+              checked={returnState.mockIp === '8.8.8.8'}
+              onChange={(e) => {
+                setReturnState(prev => ({
+                  ...prev,
+                  mockIp: e.target.checked ? '8.8.8.8' : null
+                }));
+              }}
+              className="rounded-sm border-slate-350 text-amber-500 accent-amber-500 cursor-pointer h-4 w-4"
+            />
+            <label htmlFor="simulateRiskIp" className="text-xs text-amber-800 font-bold cursor-pointer select-none">
+              ⚠️ [Testing] Simulate High-Risk Foreign IP Mismatch (force X-Forwarded-For: 8.8.8.8)
+            </label>
+          </div>
+
           {/* Bottom Action Button */}
           <div className="mt-xl pt-xl border-t border-outline-variant flex flex-col sm:flex-row gap-md justify-between items-center">
             <button 

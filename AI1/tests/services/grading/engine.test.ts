@@ -13,7 +13,7 @@ describe('applyGradingRules & computeGrade', () => {
       imageQualityScore: 1.0,
     };
 
-    const result = applyGradingRules(report, noNotes, 'gemini');
+    const result = applyGradingRules(report, noNotes, 'python');
     expect(result.grade).toBe('A+');
     expect(result.overallScore).toBe(100);
     expect(result.condition).toBe('New');
@@ -37,7 +37,7 @@ describe('applyGradingRules & computeGrade', () => {
       imageQualityScore: 0.9,
     };
 
-    const result = applyGradingRules(report, noNotes, 'gemini');
+    const result = applyGradingRules(report, noNotes, 'python');
     expect(result.scoreCeilingApplied).toBe(true);
     expect(result.overallScore).toBe(28);
     expect(['D', 'F']).toContain(result.grade);

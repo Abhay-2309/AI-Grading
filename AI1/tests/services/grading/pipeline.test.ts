@@ -32,7 +32,7 @@ describe('Grading Pipeline Aggregation logic', () => {
     process.env.DETECTION_VOTING_RUNS = '1';
   });
 
-  it('aggregates photoQuality as the minimum and itemMatchesCategory as logical AND', async () => {
+  it('aggregates itemMatchesCategory as logical AND and halts the pipeline on mismatch', async () => {
     getMock.mockResolvedValue({
       requestId: 'test-req',
       customerId: 'cust-1',
@@ -53,7 +53,7 @@ describe('Grading Pipeline Aggregation logic', () => {
     // View 2 (back): quality 0.72, itemMatchesCategory = false
     detectSingleViewMock
       .mockResolvedValueOnce({
-        modelUsed: 'gemini',
+        modelUsed: 'python',
         result: {
           damages: [],
           itemMatchesCategory: true,
@@ -62,7 +62,7 @@ describe('Grading Pipeline Aggregation logic', () => {
         },
       })
       .mockResolvedValueOnce({
-        modelUsed: 'gemini',
+        modelUsed: 'python',
         result: {
           damages: [],
           itemMatchesCategory: false,
@@ -73,18 +73,69 @@ describe('Grading Pipeline Aggregation logic', () => {
 
     await processRequest('test-req');
 
-    // Expected transition to 'GRADED' status with finalReport
-    expect(transitionStatusMock).toHaveBeenCalledWith(
+    // Mismatch must halt the pipeline before grading: no GRADED transition,
+    // and the request is marked FAILED with a CATEGORY_MISMATCH failure code.
+    expect(transitionStatusMock).not.toHaveBeenCalledWith(
       'test-req',
       'ANALYZING',
       'GRADED',
+      expect.anything()
+    );
+    expect(transitionStatusMock).toHaveBeenCalledWith(
+      'test-req',
+      'VALIDATED',
+      'FAILED',
       expect.objectContaining({
-        finalReport: expect.objectContaining({
-          blendWeight: 0.72, // MIN(0.85, 0.72)
-          itemMatchesCategory: false, // AND(true, false)
-          requiresHumanReview: true,
-          humanReviewReason: 'wrong_item_suspected', // Since itemMatchesCategory is false
-        }),
+        failureCode: 'CATEGORY_MISMATCH',
+      })
+    );
+  });
+
+  it('halts the pipeline instead of faking success when a view detection call fails', async () => {
+    getMock.mockResolvedValue({
+      requestId: 'test-req',
+      customerId: 'cust-1',
+      category: 'books',
+      returnReason: 'changed mind',
+      customerNotes: 'no notes',
+      status: 'VALIDATED',
+      images: [
+        { view: 'front', s3KeyAnalysis: 'key-front' },
+        { view: 'back', s3KeyAnalysis: 'key-back' },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Simulate the Python AI engine being unreachable for one view.
+    detectSingleViewMock
+      .mockResolvedValueOnce({
+        modelUsed: 'python',
+        result: {
+          damages: [],
+          itemMatchesCategory: true,
+          visibilityIssues: [],
+          imageQualityScore: 0.9,
+        },
+      })
+      .mockRejectedValueOnce(new Error('Python AI engine is unreachable or returned an error.'));
+
+    await processRequest('test-req');
+
+    // A failed detection call must never be papered over as a match/pass —
+    // the request should fail outright rather than producing a fabricated grade.
+    expect(transitionStatusMock).not.toHaveBeenCalledWith(
+      'test-req',
+      'ANALYZING',
+      'GRADED',
+      expect.anything()
+    );
+    expect(transitionStatusMock).toHaveBeenCalledWith(
+      'test-req',
+      'VALIDATED',
+      'FAILED',
+      expect.objectContaining({
+        failureReason: expect.stringContaining('unreachable'),
       })
     );
   });

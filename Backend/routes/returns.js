@@ -1,6 +1,8 @@
 import express from 'express';
 import prisma from '../db.js';
 import { computeRouting } from '../utils/routing.js';
+import { checkBanStatus } from '../utils/checkBanStatus.js';
+import { calculateRiskScore } from '../utils/riskScoring.js';
 
 const router = express.Router();
 
@@ -28,6 +30,7 @@ function mapReturn(r) {
     defects: r.defects ?? [],
     aiNotesContradict: r.aiNotesContradict ?? false,
     aiRequiresHumanReview: r.aiRequiresHumanReview ?? false,
+    inspection_required: r.aiRequiresHumanReview ?? false,
     agentGrade: r.agentGrade ?? '',
     agentDefects: r.agentDefects ?? '',
     disagreementCount: r.disagreementCount,
@@ -36,6 +39,8 @@ function mapReturn(r) {
     riskTier: r.riskTier,
     trend30d: r.trend30d,
     flagReason: r.flagReason,
+    refundStatus: r.refundStatus ?? 'PENDING',
+    fraudFlagReason: r.fraudFlagReason ?? null,
   };
 }
 
@@ -113,34 +118,89 @@ router.put('/:id', async (req, res) => {
 });
 
 // POST submit return from customer portal
-router.post('/submit', async (req, res) => {
+// checkBanStatus: if the submitting user is banned they receive 403 immediately
+router.post('/submit', checkBanStatus, async (req, res) => {
   try {
     const { itemId, reason, comments, subcategory, conditionAnswers } = req.body;
 
     const existing = await prisma.return.findUnique({ where: { id: itemId } });
     if (!existing) return res.status(404).json({ error: 'Return not found' });
 
-    // Reflect the actual AI grading outcome (set by grading.js's /result
-    // handler before this runs): items flagged for human review move to the
-    // hub's review queue, everything else is auto-approved and awaits
-    // pickup. Previously this always wrote 'Pending', so the customer's
-    // order list never changed after a return was submitted and approved.
-    const nextStatus = existing.aiRequiresHumanReview ? 'In Review' : 'Approved';
+    // ── Behavioral Risk Scoring ─────────────────────────────────────────────
+    const ip = req.body.mockIp || req.headers['x-forwarded-for'] || req.ip || '';
+    const rawIp = Array.isArray(ip) ? ip[0] : ip;
+    const clientIp = rawIp.split(',')[0].trim();
 
-    // userGrade/userConfidence/defects are NOT written here — they're owned
-    // solely by grading.js's /result handler, which already persists the
-    // real AI grade. Overwriting them here previously clobbered that with a
-    // stale placeholder.
+    // Look up user's purchase history for order date context
+    const purchase = await prisma.purchaseHistory.findFirst({
+      where: {
+        userId: existing.customerId,
+        itemName: existing.itemName,
+      },
+      orderBy: { purchasedAt: 'desc' },
+    });
+
+    const orderDate = purchase ? purchase.purchasedAt : new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+    const returnDate = new Date();
+
+    const riskScore = await calculateRiskScore(
+      existing.customerId,
+      clientIp,
+      orderDate,
+      returnDate,
+      existing.address || ''
+    );
+
+    let isInspectionRequired = existing.aiRequiresHumanReview;
+    let nextStatus = existing.aiRequiresHumanReview ? 'In Review' : 'Approved';
+    let refundStatus = existing.refundStatus;
+    let fraudFlagReason = existing.fraudFlagReason;
+    let riskTier = existing.riskTier;
+    let flagReason = existing.flagReason;
+    let routing = existing.routing;
+
+    if (riskScore < 30) {
+      // 1. Trusted Tier
+      isInspectionRequired = false;
+      nextStatus = 'Approved';
+      refundStatus = 'APPROVED';
+      riskTier = 'Baseline';
+      flagReason = `Trusted Account (Risk Score: ${riskScore})`;
+    } else if (riskScore >= 70) {
+      // 2. High Risk Tier - Instant Quarantine
+      isInspectionRequired = true;
+      nextStatus = 'In Review';
+      refundStatus = 'HELD_FOR_REVIEW';
+      fraudFlagReason = `High risk score (${riskScore}) calculated by Behavioral Risk engine`;
+      riskTier = 'Critical Risk';
+      flagReason = 'Behavioral Risk Alert';
+      routing = 'Manual Review';
+    } else {
+      // 3. Middle Tier (30 <= riskScore < 70) - Standard AI vision routing
+      isInspectionRequired = true;
+      nextStatus = 'In Progress'; // standard AI pipeline status
+      refundStatus = 'PENDING';
+      riskTier = 'Moderate Risk';
+      flagReason = `Standard Inspection Required (Risk Score: ${riskScore})`;
+    }
+
     const updated = await prisma.return.update({
       where: { id: itemId },
       data: {
         reason,
         comments,
         status: nextStatus,
+        aiRequiresHumanReview: isInspectionRequired,
+        refundStatus,
+        fraudFlagReason,
+        riskTier,
+        flagReason,
+        ...(routing && { routing }),
         ...(subcategory !== undefined && { subcategory }),
         ...(conditionAnswers !== undefined && { conditionAnswers }),
       },
     });
+
     res.json(mapReturn(updated));
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Return not found' });

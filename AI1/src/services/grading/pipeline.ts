@@ -1,16 +1,16 @@
 import { logger } from '../../utils/logger.js';
 import { gradingRepository } from '../db/repository.js';
 import { getObjectBuffer } from '../storage/s3.js';
-import { GeminiGrader } from '../ai/clients/geminiGrader.js';
-import { GemmaGrader } from '../ai/clients/gemmaGrader.js';
+import { PythonGrader } from '../ai/clients/pythonGrader.js';
 import { FallbackOrchestrator } from '../ai/orchestrator.js';
 import { deduplicateCrossViewDamages } from '../ai/dedup.js';
 import { voteMergeDamages } from '../ai/voting.js';
 import { computeGrade, isNearBandEdge } from './computeGrade.js';
+import { CategoryMismatchError, ModelUnavailableError } from '../../utils/errors.js';
 import type { DetectionResult, DetectedDamage } from '../../schemas/grading-report.schema.js';
 import type { SingleViewDetectionInput, GradingImageInput } from '../ai/clients/types.js';
 
-const orchestrator = new FallbackOrchestrator(new GeminiGrader(), new GemmaGrader());
+const orchestrator = new FallbackOrchestrator(new PythonGrader());
 
 function mimetypeFromKey(key: string): string {
   if (key.endsWith('.png')) return 'image/png';
@@ -20,7 +20,7 @@ function mimetypeFromKey(key: string): string {
 
 export interface RunSingleDetectionPassResult {
   runResult: DetectionResult;
-  modelUsed: 'gemini' | 'gemma';
+  modelUsed: 'python' | 'gemma';
   failedViews: string[];
   successfulViewQualities: number[];
   successfulViewMatches: boolean[];
@@ -53,9 +53,10 @@ async function runSingleDetectionPass(
   const damages: DetectedDamage[] = [];
   const failedViews: string[] = [];
   const visibilityIssues: string[] = [];
-  let modelUsed: 'gemini' | 'gemma' = 'gemini';
+  let modelUsed: 'python' | 'gemma' = 'python';
   const successfulViewQualities: number[] = [];
   const successfulViewMatches: boolean[] = [];
+  const mismatchReasons: string[] = [];
 
   for (let i = 0; i < settled.length; i++) {
     const viewName = images[i]!.view;
@@ -68,10 +69,16 @@ async function runSingleDetectionPass(
       if (det.visibilityIssues) visibilityIssues.push(...det.visibilityIssues);
       successfulViewQualities.push(det.imageQualityScore ?? 0.9);
       successfulViewMatches.push(det.itemMatchesCategory ?? true);
+      if (det.categoryMismatchReason) mismatchReasons.push(det.categoryMismatchReason);
     } else {
-      logger.warn({ requestId, view: viewName, err: String(res.reason) }, 'detection failed for single view; fallback to mock success');
-      successfulViewQualities.push(0.95);
-      successfulViewMatches.push(true);
+      logger.error({ requestId, view: viewName, err: String(res.reason) }, 'detection failed for single view; aborting request');
+      throw res.reason instanceof Error
+        ? res.reason
+        : new ModelUnavailableError(`Detection failed for view '${viewName}'.`, {
+            requestId,
+            view: viewName,
+            reason: String(res.reason),
+          });
     }
   }
 
@@ -85,6 +92,7 @@ async function runSingleDetectionPass(
   const aggregatedResult: DetectionResult = {
     damages,
     itemMatchesCategory,
+    categoryMismatchReason: mismatchReasons.length > 0 ? mismatchReasons.join(' ') : undefined,
     visibilityIssues: Array.from(new Set(visibilityIssues)),
     imageQualityScore: Number(avgQualityScore.toFixed(2)),
   };
@@ -124,10 +132,11 @@ export async function processRequest(requestId: string): Promise<void> {
     let targetRuns = Math.max(1, votingRunsConfig);
 
     const runResults: DetectionResult[] = [];
-    let primaryModelUsed: 'gemini' | 'gemma' = 'gemini';
+    let primaryModelUsed: 'python' | 'gemma' = 'python';
     const allFailedViews = new Set<string>();
     const allSuccessfulQualities: number[] = [];
     const allSuccessfulMatches: boolean[] = [];
+    let categoryMismatchReason: string | undefined = undefined;
 
     for (let r = 0; r < targetRuns; r++) {
       const pass = await runSingleDetectionPass(
@@ -143,6 +152,9 @@ export async function processRequest(requestId: string): Promise<void> {
       pass.failedViews.forEach((v) => allFailedViews.add(v));
       pass.successfulViewQualities.forEach((q) => allSuccessfulQualities.push(q));
       pass.successfulViewMatches.forEach((m) => allSuccessfulMatches.push(m));
+      if (pass.runResult.categoryMismatchReason) {
+        categoryMismatchReason = pass.runResult.categoryMismatchReason;
+      }
     }
 
     // Phase 3: Voting merge
@@ -155,6 +167,13 @@ export async function processRequest(requestId: string): Promise<void> {
     const itemMatchesCategory = allSuccessfulMatches.length > 0
       ? allSuccessfulMatches.every((v) => v)
       : true;
+
+    if (!itemMatchesCategory) {
+      throw new CategoryMismatchError(
+        categoryMismatchReason || `Uploaded item does not match claimed category '${record.category}'.`,
+        { requestId, category: record.category }
+      );
+    }
 
     // Initial computeGrade evaluation
     let finalReport = computeGrade({

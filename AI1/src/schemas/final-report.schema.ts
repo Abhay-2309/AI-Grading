@@ -33,7 +33,7 @@ export const finalReportSchema = z.object({
   overallConfidence: z.number().min(0).max(1),
   requiresHumanReview: z.boolean(),
   humanReviewReason: z.string().optional(),
-  modelUsed: z.enum(['gemini', 'gemma']),
+  modelUsed: z.enum(['python', 'gemma']),
   votingRuns: z.number().default(1),
   damagesDroppedByVoting: z.array(droppedDamageSchema).default([]),
   detectionFailedViews: z.array(z.string()).default([]),

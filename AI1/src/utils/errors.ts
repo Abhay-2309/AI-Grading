@@ -16,6 +16,9 @@ export type ErrorCode =
   | 'MODEL_OUTPUT_INVALID'
   | 'STORAGE_ERROR'
   | 'RATE_LIMITED'
+  | 'FRAUD_BLOCK'
+  | 'VELOCITY_EXCEEDED'
+  | 'CATEGORY_MISMATCH'
   | 'INTERNAL_ERROR';
 
 export class AppError extends Error {
@@ -92,6 +95,49 @@ export class ModelOutputError extends AppError {
   }
 }
 
-export function isAppError(err: unknown): err is AppError {
-  return err instanceof AppError;
+/**
+ * Thrown by the grading pipeline when the vision model detects that the
+ * uploaded item does not match the claimed category. This halts the pipeline
+ * before a grade is computed — the request is marked FAILED rather than
+ * silently flagged for human review.
+ */
+export class CategoryMismatchError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super('CATEGORY_MISMATCH', message, 422, details);
+  }
+}
+
+export function isAppError(err: any): err is AppError {
+  return err && (err instanceof AppError || (typeof err.code === 'string' && typeof err.statusCode === 'number'));
+}
+
+// ── Fraud Firewall errors ────────────────────────────────────────────
+
+export type FraudReason =
+  | 'VELOCITY_EXCEEDED'
+  | 'MISSING_USER_AGENT'
+  | 'HIGH_RISK_GEO';
+
+/**
+ * Thrown by the fraud-firewall middleware when a request is blocked.
+ * The error handler serialises this as { status: "FRAUD_FLAG", reason: "..." }
+ * instead of the standard AppError envelope.
+ */
+export class FraudBlockError extends AppError {
+  readonly fraudReason: FraudReason;
+
+  constructor(reason: FraudReason, details?: Record<string, unknown>) {
+    const isVelocity = reason === 'VELOCITY_EXCEEDED';
+    super(
+      isVelocity ? 'VELOCITY_EXCEEDED' : 'FRAUD_BLOCK',
+      `Request blocked by fraud firewall: ${reason}`,
+      isVelocity ? 429 : 403,
+      details
+    );
+    this.fraudReason = reason;
+  }
+}
+
+export function isFraudBlockError(err: any): err is FraudBlockError {
+  return err && (err instanceof FraudBlockError || err.code === 'FRAUD_BLOCK' || err.code === 'VELOCITY_EXCEEDED');
 }
