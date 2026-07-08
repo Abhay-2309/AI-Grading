@@ -1,0 +1,16 @@
+# Core Vision & Machine Learning Framework
+ultralytics>=8.3.0
+
+# Tensor Computation & Hardware Acceleration (Stable 2026 builds)
+torch>=2.12.0
+torchvision>=0.17.0
+
+# Image Processing & Mask Extraction (Used in the consolidation script)
+opencv-python>=4.1.1
+Pillow>=10.3.0
+
+# Array Mathematics & Matrix Transformations
+numpy>=1.23.5
+
+# Structural Configuration Parsing
+PyYAML>=5.3.1

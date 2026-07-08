@@ -1,0 +1,21 @@
+# Python Virtual Environment
+env/
+
+# Python Cache & Notebooks
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+
+# macOS System Files
+.DS_Store
+
+# Large Datasets & Raw Data
+Dataset/
+Rawdataset/
+local_moondream/
+
+
+# IDE / Editor Settings
+.gemini/
+.vscode/
