@@ -12,31 +12,57 @@ async function getRiskProfile() {
   const profile = await prisma.profile.findUnique({ where: { id: DEFAULT_USER_ID } });
   if (!profile) return null;
 
-  const [totalReturns, disagreementAgg, reasonGroups] = await Promise.all([
-    prisma.return.count({
-      where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' } },
-    }),
-    prisma.return.aggregate({
-      where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' } },
-      _sum: { disagreementCount: true },
-    }),
-    prisma.return.groupBy({
-      by: ['reason'],
-      where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' }, reason: { not: null } },
-      _count: { reason: true },
-      orderBy: { _count: { reason: 'desc' } },
-    }),
-  ]);
+  // Query live e-commerce tables first
+  const ecommerceOrderCount = await prisma.order.count({
+    where: { customerId: DEFAULT_USER_ID }
+  });
 
-  const totalDisagreements = disagreementAgg._sum.disagreementCount || 0;
-  const topReturnReason = reasonGroups[0]?.reason || null;
+  let totalOrdersPlaced = profile.totalOrdersPlaced;
+  let totalReturns = 0;
+  let topReturnReason = null;
+  let totalDisagreements = 0;
+
+  if (ecommerceOrderCount > 0) {
+    totalOrdersPlaced = ecommerceOrderCount;
+    totalReturns = await prisma.ecommerceReturn.count({
+      where: { order: { customerId: DEFAULT_USER_ID } }
+    });
+    const reasonGroups = await prisma.ecommerceReturn.groupBy({
+      by: ['returnReason'],
+      where: { order: { customerId: DEFAULT_USER_ID } },
+      _count: { returnReason: true },
+      orderBy: { _count: { returnReason: 'desc' } }
+    });
+    topReturnReason = reasonGroups[0]?.returnReason || null;
+  } else {
+    // Fallback to returns hub tables
+    const [returnsCount, disagreementAgg, reasonGroups] = await Promise.all([
+      prisma.return.count({
+        where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' } },
+      }),
+      prisma.return.aggregate({
+        where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' } },
+        _sum: { disagreementCount: true },
+      }),
+      prisma.return.groupBy({
+        by: ['reason'],
+        where: { customerId: DEFAULT_USER_ID, status: { not: 'Pending' }, reason: { not: null } },
+        _count: { reason: true },
+        orderBy: { _count: { reason: 'desc' } },
+      }),
+    ]);
+    totalReturns = returnsCount;
+    totalDisagreements = disagreementAgg._sum.disagreementCount || 0;
+    topReturnReason = reasonGroups[0]?.reason || null;
+  }
+
   const { returnRate, score, tier, rewardCredits } = computeCreditScore({
-    totalOrdersPlaced: profile.totalOrdersPlaced,
+    totalOrdersPlaced,
     totalReturns,
     totalDisagreements,
   });
 
-  return { profile, totalReturns, totalDisagreements, topReturnReason, returnRate, score, tier, rewardCredits };
+  return { profile, totalOrdersPlaced, totalReturns, totalDisagreements, topReturnReason, returnRate, score, tier, rewardCredits };
 }
 
 // GET user profile: credits, stats, donation history
@@ -109,7 +135,7 @@ router.get('/risk-score', async (req, res) => {
   try {
     const risk = await getRiskProfile();
     if (!risk) return res.status(404).json({ error: 'Profile not found' });
-    const { profile, totalReturns, totalDisagreements, topReturnReason, returnRate, score, tier, rewardCredits } = risk;
+    const { profile, totalOrdersPlaced, totalReturns, totalDisagreements, topReturnReason, returnRate, score, tier, rewardCredits } = risk;
 
     const alreadyClaimed = rewardCredits > 0
       ? Boolean(await prisma.donationHistory.findFirst({
@@ -118,7 +144,7 @@ router.get('/risk-score', async (req, res) => {
       : false;
 
     res.json({
-      totalOrdersPlaced: profile.totalOrdersPlaced,
+      totalOrdersPlaced,
       totalReturns,
       totalDisagreements,
       topReturnReason,

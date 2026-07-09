@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { apiFetch } from '../../../services/api';
+import ProductReviewsSection from '../components/ProductReviewsSection';
 
 // Tier styling for the personalized return-risk nudge — mirrors the palette
 // used on the hub-admin Account Risk & Trust Score page so the same tier
@@ -24,13 +25,43 @@ export default function VirtualTryOn({ onBackToGateway }) {
   const [tryOnStep, setTryOnStep] = useState(1); // 1 = Upload/Prompt, 2 = Loading, 3 = Result, 4 = Error
   const [selectedMethod, setSelectedMethod] = useState('photo'); // 'photo' or 'model'
   const [cartCount, setCartCount] = useState(0);
+  const [selectedSize, setSelectedSize] = useState('Select Size');
+
+  const [recommendedSize, setRecommendedSize] = useState('');
+  const [confidencePct, setConfidencePct] = useState(80);
+  const [sampleSize, setSampleSize] = useState(0);
+  const [reviewSizingNote, setReviewSizingNote] = useState('');
 
   // Personalized return-risk nudge — the customer's own order/return
   // history, fetched once so "Return rate for this item" can speak to
   // *their* likelihood of returning it, not a generic item-level stat.
   const [riskProfile, setRiskProfile] = useState(null);
+  const [productAnalysis, setProductAnalysis] = useState(null);
+  
   useEffect(() => {
     apiFetch('/api/profile/risk-score').then(setRiskProfile).catch(() => setRiskProfile(null));
+    apiFetch('/api/products/apparel-prod-1/returns-analysis').then(setProductAnalysis).catch(() => setProductAnalysis(null));
+    
+    // Fetch apparel size recommendation based on reviews NLP and user profile
+    apiFetch('/api/products/apparel-prod-1/fit-recommendation', {
+      method: 'POST',
+      body: JSON.stringify({
+        chestCm: 94.0,
+        heightCm: 175.0,
+        weightKg: 70.0
+      })
+    })
+      .then(data => {
+        if (data.recommended_size) {
+          setRecommendedSize(data.recommended_size);
+          setConfidencePct(data.confidence_pct);
+          setSampleSize(data.sample_size);
+          setReviewSizingNote(data.review_sizing_note);
+        }
+      })
+      .catch(err => {
+        console.error('Fit recommendation error:', err);
+      });
   }, []);
 
   // Hoodie images by color — the actual garment reference sent to the
@@ -487,6 +518,23 @@ export default function VirtualTryOn({ onBackToGateway }) {
                   </div>
                 );
               })()}
+
+              {/* Product Sizing & Return Insight Banner */}
+              {productAnalysis && productAnalysis.returnSuggestion && (
+                <div className="mt-2.5 bg-amber-50/50 border border-amber-250 p-3 rounded-md flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-600 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    warning
+                  </span>
+                  <div>
+                    <p className="font-bold text-xs text-amber-900">
+                      Product Return Insight
+                    </p>
+                    <p className="text-[11px] text-amber-800 leading-tight mt-0.5">
+                      {productAnalysis.returnSuggestion}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -511,13 +559,41 @@ export default function VirtualTryOn({ onBackToGateway }) {
 
               <div className="flex flex-col gap-1">
                 <p className="font-bold text-xs text-gray-800 block mb-1">Size:</p>
-                <select className="amazon-btn-secondary px-3 py-1.5 rounded text-xs w-full max-w-[200px] shadow-sm bg-white">
+                <select 
+                  value={selectedSize}
+                  onChange={(e) => setSelectedSize(e.target.value)}
+                  className="amazon-btn-secondary px-3 py-1.5 rounded text-xs w-full max-w-[200px] shadow-sm bg-white"
+                >
                   <option>Select Size</option>
                   <option>Small (38)</option>
                   <option>Medium (40)</option>
                   <option>Large (42)</option>
                   <option>X-Large (44)</option>
                 </select>
+
+                {/* Sizing Recommendations Box */}
+                {recommendedSize && (
+                  <div className="bg-[#f7fafa] border border-[#007185]/20 p-3.5 rounded mt-2.5 text-left max-w-[280px]">
+                    <div className="text-[#007185] font-bold text-xs mb-0.5">We recommend a {recommendedSize} in this style</div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
+                      <span className="material-symbols-outlined text-[14px] text-orange-600 font-bold" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        verified
+                      </span>
+                      <span>{confidencePct}% Sizing Match Confidence</span>
+                    </div>
+                    {reviewSizingNote && (
+                      <p className="text-[10px] text-gray-600 mt-1.5 italic leading-tight">
+                        {reviewSizingNote}
+                      </p>
+                    )}
+                    <button 
+                      onClick={() => setSelectedSize(recommendedSize)}
+                      className="mt-2.5 bg-[#FFA41C] border border-[#FF8F00] text-[#0f1111] hover:bg-[#F29F1B] rounded-full py-1.5 px-4 text-[10px] font-bold shadow-sm focus:outline-none cursor-pointer"
+                    >
+                      Select this size
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5 pt-2">
@@ -576,6 +652,10 @@ export default function VirtualTryOn({ onBackToGateway }) {
             </div>
           </div>
 
+        </div>
+
+        <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <ProductReviewsSection productId="apparel-prod-1" />
         </div>
       </main>
 

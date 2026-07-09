@@ -34,6 +34,9 @@ function mapProduct(p) {
     aiStatus: p.aiStatus,
     grade: p.grade,
     defects: p.defects ?? [],
+    photos: p.photos ?? {},
+    subcategory: p.subcategory ?? null,
+    conditionAnswers: p.conditionAnswers ?? {},
   };
 }
 

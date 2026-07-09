@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../../../services/api';
+import ProductReviewsSection from '../components/ProductReviewsSection';
 
 // Standard Indian (= UK) adult shoe size chart — nominal foot length in cm
 // per whole size. India uses the same numeric scale as UK sizing.
@@ -43,6 +44,15 @@ export default function ShoeSizeFinder({ onBackToGateway }) {
   const [selectedSize, setSelectedSize] = useState('Select Size');
   const [cartCount, setCartCount] = useState(0);
 
+  const [confidencePct, setConfidencePct] = useState(98);
+  const [sampleSize, setSampleSize] = useState(2847);
+  const [reviewSizingNote, setReviewSizingNote] = useState('');
+  const [productAnalysis, setProductAnalysis] = useState(null);
+
+  useEffect(() => {
+    apiFetch('/api/products/shoe-prod-1/returns-analysis').then(setProductAnalysis).catch(() => setProductAnalysis(null));
+  }, []);
+
   // "Use my previous size" tab state
   const [previousSizeLoading, setPreviousSizeLoading] = useState(false);
   const [previousSizeResult, setPreviousSizeResult] = useState(null); // { found, itemName, size, ... }
@@ -67,21 +77,40 @@ export default function ShoeSizeFinder({ onBackToGateway }) {
   const [mainImage, setMainImage] = useState(shoeImages[0]);
   const [selectedColor, setSelectedColor] = useState('blue');
 
-  // Sizing algorithm based on foot length input, per the standard Indian
-  // shoe size chart — swaps units without re-deriving from scratch.
+  // Sizing algorithm based on foot length input, calling backend API
   useEffect(() => {
     const val = parseFloat(footLength);
     if (isNaN(val)) return;
     const cm = lengthUnit === 'in' ? val * CM_PER_INCH : val;
 
-    let size = cmToIndSize(cm);
-    // Wide/extra-wide feet fit better sized up a half-to-full size.
-    if (footWidth === 'Wide' || footWidth === 'Extra Wide') {
-      size = Math.min(size + 1, MAX_IND_SIZE);
-    }
-
-    setRecommendedSize(`IND ${size}`);
-  }, [footLength, footWidth, lengthUnit]);
+    apiFetch('/api/products/shoe-prod-1/fit-recommendation', {
+      method: 'POST',
+      body: JSON.stringify({
+        footLengthCm: cm,
+        footWidth,
+        whichFootLarger: largerFoot
+      })
+    })
+      .then((data) => {
+        if (data.recommended_size) {
+          setRecommendedSize(data.recommended_size);
+          setConfidencePct(data.confidence_pct);
+          setSampleSize(data.sample_size);
+          setReviewSizingNote(data.review_sizing_note);
+        }
+      })
+      .catch((err) => {
+        console.error('Fit recommendation error:', err);
+        let size = cmToIndSize(cm);
+        if (footWidth === 'Wide' || footWidth === 'Extra Wide') {
+          size = Math.min(size + 1, MAX_IND_SIZE);
+        }
+        setRecommendedSize(`IND ${size}`);
+        setConfidencePct(70);
+        setSampleSize(0);
+        setReviewSizingNote('');
+      });
+  }, [footLength, footWidth, lengthUnit, largerFoot]);
 
   const handleUnitChange = (nextUnit) => {
     if (nextUnit === lengthUnit) return;
@@ -451,9 +480,9 @@ export default function ShoeSizeFinder({ onBackToGateway }) {
                               <span className="material-symbols-outlined text-[16px] text-orange-600 font-bold" style={{ fontVariationSettings: "'FILL' 1" }}>
                                 verified
                               </span>
-                              <span>98% Sizing Match Confidence</span>
+                              <span>{confidencePct}% Sizing Match Confidence</span>
                             </div>
-                            <p className="text-[11px] text-[#565959] mt-1 italic">Calculated from 2,847 verified sizing profiles</p>
+                            <p className="text-[11px] text-[#565959] mt-1 italic">Calculated from {sampleSize.toLocaleString()} verified sizing profiles</p>
                           </div>
                           <button
                             onClick={() => handleUseSize()}
@@ -463,12 +492,32 @@ export default function ShoeSizeFinder({ onBackToGateway }) {
                           </button>
                         </div>
 
+                        {/* NLP Sizing Sentiment Note */}
+                        {reviewSizingNote && (
+                          <div className="mt-3 flex gap-2 items-start bg-blue-50/50 p-2.5 rounded border border-blue-150 text-left">
+                            <span className="material-symbols-outlined text-blue-600 text-[18px]">rate_review</span>
+                            <p className="text-xs text-blue-900 leading-tight">
+                              {reviewSizingNote}
+                            </p>
+                          </div>
+                        )}
+
                         {/* Extra Sizing Advice */}
                         {(footWidth === 'Wide' || footWidth === 'Extra Wide') && (
                           <div className="mt-3 flex gap-2 items-start bg-amber-50 p-2 rounded border border-amber-200 text-left">
                             <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
                             <p className="text-xs text-amber-900 leading-tight">
                               Since you selected {footWidth}, we've sized up from your raw measurement to {recommendedSize} for a more comfortable fit.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Product Return Insight Warning */}
+                        {productAnalysis && productAnalysis.returnSuggestion && (
+                          <div className="mt-3 flex gap-2 items-start bg-amber-50/50 p-2.5 rounded border border-amber-250 text-left">
+                            <span className="material-symbols-outlined text-amber-650 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                            <p className="text-xs text-amber-900 leading-tight font-medium">
+                              {productAnalysis.returnSuggestion}
                             </p>
                           </div>
                         )}
@@ -778,6 +827,10 @@ export default function ShoeSizeFinder({ onBackToGateway }) {
             </div>
           </div>
 
+        </div>
+
+        <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <ProductReviewsSection productId="shoe-prod-1" />
         </div>
       </main>
 

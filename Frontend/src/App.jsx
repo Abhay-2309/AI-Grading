@@ -32,6 +32,7 @@ import P2PMarketSearchResults from './features/p2p-market/pages/P2PMarketSearchR
 import P2PMarketProductDetail from './features/p2p-market/pages/P2PMarketProductDetail';
 import P2PMarketSellItem from './features/p2p-market/pages/P2PMarketSellItem';
 import P2PMarketMessages from './features/p2p-market/pages/P2PMarketMessages';
+import MarketConnectAIInspection from './features/p2p-market/pages/MarketConnectAIInspection';
 
 // Donation Pages
 import DonationHome from './features/donation/pages/DonationHome';
@@ -94,12 +95,16 @@ export default function App() {
   const [preventionPage, setPreventionPage] = useState('selector'); // 'selector', 'try-on', 'size-finder'
 
   // P2P Market subrouting states
-  const [p2pPage, setP2pPage] = useState('home'); // 'home', 'search', 'detail', 'sell', 'messages'
+  const [p2pPage, setP2pPage] = useState('home'); // 'home', 'search', 'detail', 'sell', 'messages', 'ai-inspect'
   const [p2pSearchQuery, setP2pSearchQuery] = useState('');
   const [p2pSearchCategory, setP2pSearchCategory] = useState('All');
   const [p2pSearchFilter, setP2pSearchFilter] = useState('');
   const [p2pSelectedProductId, setP2pSelectedProductId] = useState('p2p-prod-1');
   const [p2pActiveChatId, setP2pActiveChatId] = useState(null);
+  // State for standalone AI inspection page
+  const [p2pInspectProductId, setP2pInspectProductId] = useState(null);
+  const [p2pInspectCategory, setP2pInspectCategory] = useState('Electronics');
+  const [p2pInspectTitle, setP2pInspectTitle] = useState('');
 
   // Donation subrouting states
   const [donationPage, setDonationPage] = useState('donation-home'); // 'donation-home', 'ngo-profile', 'donation-flow', 'green-credits'
@@ -1273,6 +1278,7 @@ export default function App() {
               greenCredits={greenCredits}
               onNavigate={navigateP2P}
               onExit={() => navigateToDashboard('gateway')}
+              subcategoryTaxonomy={subcategoryTaxonomy}
             />
           )}
           {p2pPage === 'messages' && (
@@ -1282,6 +1288,20 @@ export default function App() {
               activeChatId={p2pActiveChatId}
               userLocation={userLocation}
               onDetectLocation={detectUserLocation}
+              onNavigate={navigateP2P}
+              onExit={() => navigateToDashboard('gateway')}
+            />
+          )}
+          {p2pPage === 'ai-inspect' && (
+            <MarketConnectAIInspection
+              productId={p2pInspectProductId}
+              productTitle={p2pInspectTitle}
+              category={p2pInspectCategory}
+              subcategoryTaxonomy={subcategoryTaxonomy}
+              userLocation={userLocation}
+              onDetectLocation={detectUserLocation}
+              onNext={() => navigateP2P('home')}
+              onBack={() => navigateP2P('sell')}
               onNavigate={navigateP2P}
               onExit={() => navigateToDashboard('gateway')}
             />

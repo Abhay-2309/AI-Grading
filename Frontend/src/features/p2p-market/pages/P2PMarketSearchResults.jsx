@@ -378,10 +378,10 @@ export default function P2PMarketSearchResults({
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-12 text-center space-y-4">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-12 flex flex-col items-center text-center space-y-4">
                 <span className="material-symbols-outlined text-[48px] text-slate-300">search_off</span>
                 <h3 className="text-base font-bold text-slate-800">No matching items found</h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                <p className="text-xs text-slate-500 max-w-[384px] text-center">
                   Try adjusting your price filters, selecting a different category, or clearing your query.
                 </p>
                 <button 

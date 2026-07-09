@@ -235,55 +235,68 @@ function mapGradeToCondition(grade) {
   return 'Unsalvageable';
 }
 
-async function getImageBufferAndMimetype(imageStr) {
-  if (!imageStr) return null;
-  if (imageStr.startsWith('data:')) {
-    const matches = imageStr.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (matches && matches.length === 3) {
-      return {
-        mimeType: matches[1],
-        buffer: Buffer.from(matches[2], 'base64'),
-      };
-    }
-  } else if (imageStr.startsWith('http://') || imageStr.startsWith('https://')) {
-    const res = await fetch(imageStr);
-    if (res.ok) {
-      const arrayBuffer = await res.arrayBuffer();
-      return {
-        mimeType: res.headers.get('content-type') || 'image/jpeg',
-        buffer: Buffer.from(arrayBuffer),
-      };
-    }
-  }
-  return null;
+function bufferToDataUrl(buffer, mimetype) {
+  return `data:${mimetype};base64,${buffer.toString('base64')}`;
 }
 
-// POST /api/grading/p2p/:productId/submit — forwards listing photo + metadata to AI1's /grade
-router.post('/p2p/:productId/submit', async (req, res) => {
+// POST /api/grading/p2p/:productId/submit — MarketConnect's own seller
+// inspection step (independent of the returns flow): accepts the seller's
+// real multi-angle photos plus condition answers, persists the photos onto
+// the listing (there's no image-hosting backend for P2P — the data URI *is*
+// the stored image, same as the rest of this feature), and forwards
+// everything to AI1's /grade exactly like a return submission does.
+router.post('/p2p/:productId/submit', upload.fields(UPLOAD_FIELDS), async (req, res) => {
   try {
     const { productId } = req.params;
     const existing = await prisma.p2pProduct.findUnique({ where: { id: productId } });
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-    const imgData = await getImageBufferAndMimetype(existing.image);
-    if (!imgData) return res.status(400).json({ error: 'No valid image on file for this listing' });
+    const { subcategory, conditionAnswers, extraAnswers } = req.body;
 
-    // Determine target category for AI1
-    const aiCategory = mapCategory(existing.category, null);
+    const leaf = findSubcategoryLeaf(existing.category, subcategory);
+    const aiCategory = mapCategory(existing.category, subcategory);
+    const required = leaf?.requiredViews || REQUIRED_VIEWS[aiCategory] || REQUIRED_VIEWS.other;
 
-    // Look up required views for this category
-    const required = REQUIRED_VIEWS[aiCategory] || ['front', 'back'];
+    const missing = required.filter((view) => !req.files?.[view]?.[0]);
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing required photo(s): ${missing.join(', ')}` });
+    }
+
+    let parsedExtra;
+    if (extraAnswers) {
+      try {
+        parsedExtra = JSON.parse(extraAnswers);
+      } catch {
+        // ignore malformed extra answers rather than failing the whole submission
+      }
+    }
 
     const form = new FormData();
-    // Re-use the single uploaded photo buffer for all required views of this category
+    const photos = {};
     for (const view of required) {
-      form.append(view, new Blob([imgData.buffer], { type: imgData.mimeType }), `image_${view}.jpg`);
+      const file = req.files[view][0];
+      form.append(view, new Blob([file.buffer], { type: file.mimetype }), file.originalname);
+      photos[view] = bufferToDataUrl(file.buffer, file.mimetype);
     }
+
+    // Subcategory-specific answers (powers on?, battery health, tags attached,
+    // etc.) can't be scored directly — they become part of the free-text
+    // customerNotes AI1's vision model reads, same as the returns flow.
+    const notesSource = {
+      category: existing.category,
+      subcategory: subcategory || existing.subcategory,
+      conditionAnswers: parsedExtra ?? existing.conditionAnswers,
+      comments: existing.description,
+    };
 
     form.append('customerId', `p2p_${productId}`);
     form.append('category', aiCategory);
     form.append('returnReason', 'P2P Sale');
-    form.append('customerNotes', existing.description || 'P2P Listing');
+    form.append('customerNotes', buildCustomerNotes(notesSource));
+    // The 5-dimension generic answers (coreFunction/completeness/structure/
+    // usage/originality) are AI1's own structured schema — these directly
+    // drive its questionScore, unlike the free-text notes above.
+    if (conditionAnswers) form.append('conditionAnswers', conditionAnswers);
 
     const aiResponse = await fetch(`${AI1_BASE_URL}/grade`, { method: 'POST', body: form });
     const aiBody = await aiResponse.json();
@@ -292,11 +305,19 @@ router.post('/p2p/:productId/submit', async (req, res) => {
       return res.status(aiResponse.status).json(aiBody);
     }
 
+    const viewNames = Object.keys(photos);
+    const primaryView = viewNames.includes('front') ? 'front' : viewNames[0];
+
     await prisma.p2pProduct.update({
       where: { id: productId },
       data: {
         aiRequestId: aiBody.requestId,
         aiStatus: aiBody.status,
+        photos,
+        image: photos[primaryView],
+        thumbnails: viewNames.filter((v) => v !== primaryView).map((v) => photos[v]),
+        ...(subcategory && { subcategory }),
+        ...(parsedExtra !== undefined && { conditionAnswers: parsedExtra }),
       },
     });
 

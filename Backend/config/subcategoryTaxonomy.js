@@ -141,13 +141,66 @@ export const SUBCATEGORY_TAXONOMY = {
   BOOKS: {
     subcategories: [
       {
-        key: 'book',
-        label: 'Book',
+        key: 'fiction',
+        label: 'Fiction / Novel',
         aiCategory: 'books',
         requiredViews: ['front', 'back'],
         conditionQuestions: [
-          { key: 'writingInside', label: 'Any writing/highlighting inside?', type: 'boolean' },
+          { key: 'writingInside', label: 'Any writing or highlighting inside?', type: 'boolean' },
           { key: 'dustJacketIncluded', label: 'Dust jacket included (if applicable)?', type: 'boolean' },
+        ],
+      },
+      {
+        key: 'romance',
+        label: 'Romance',
+        aiCategory: 'books',
+        requiredViews: ['front', 'back'],
+        conditionQuestions: [
+          { key: 'writingInside', label: 'Any writing or highlighting inside?', type: 'boolean' },
+          { key: 'pagesTorn', label: 'Any torn or missing pages?', type: 'boolean' },
+        ],
+      },
+      {
+        key: 'educational',
+        label: 'Educational / Academic',
+        aiCategory: 'books',
+        requiredViews: ['front', 'back', 'closeup_1'],
+        viewLabels: { closeup_1: 'Access code / inside cover' },
+        conditionQuestions: [
+          { key: 'writingInside', label: 'Any writing or highlighting inside?', type: 'boolean' },
+          { key: 'accessCodeUsed', label: 'Access code used or scratched?', type: 'boolean' },
+          { key: 'dustJacketIncluded', label: 'All supplementary materials included?', type: 'boolean' },
+        ],
+      },
+      {
+        key: 'selfhelp',
+        label: 'Self-Help / Motivational',
+        aiCategory: 'books',
+        requiredViews: ['front', 'back'],
+        conditionQuestions: [
+          { key: 'writingInside', label: 'Any writing or highlighting inside?', type: 'boolean' },
+          { key: 'dustJacketIncluded', label: 'Dust jacket included (if applicable)?', type: 'boolean' },
+        ],
+      },
+      {
+        key: 'comics',
+        label: 'Comics / Graphic Novel',
+        aiCategory: 'books',
+        requiredViews: ['front', 'back', 'closeup_1'],
+        viewLabels: { closeup_1: 'Spine / staples close-up' },
+        conditionQuestions: [
+          { key: 'spineIntact', label: 'Spine / staples intact?', type: 'boolean' },
+          { key: 'writingInside', label: 'Any writing or markings inside?', type: 'boolean' },
+        ],
+      },
+      {
+        key: 'other_book',
+        label: 'Other Book',
+        aiCategory: 'books',
+        requiredViews: ['front', 'back'],
+        conditionQuestions: [
+          { key: 'writingInside', label: 'Any writing or highlighting inside?', type: 'boolean' },
+          { key: 'dustJacketIncluded', label: 'Dust jacket / extras included?', type: 'boolean' },
         ],
       },
     ],

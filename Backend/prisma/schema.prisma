@@ -6,28 +6,31 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────
 // User Profiles
 // ─────────────────────────────────────────────
 model Profile {
-  id              String            @id @default(uuid())
-  email           String            @unique
-  fullName        String?           @map("full_name")
-  greenCredits    Int               @default(320) @map("green_credits")
-  treesPlanted    Int               @default(14) @map("trees_planted")
-  causesHelped    Int               @default(8) @map("causes_helped")
-  totalOrdersPlaced Int             @default(0) @map("total_orders_placed")
-  isBanned        Boolean           @default(false) @map("is_banned")
-  createdAt       DateTime          @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  email             String   @unique
+  fullName          String?  @map("full_name")
+  greenCredits      Int      @default(320) @map("green_credits")
+  treesPlanted      Int      @default(14) @map("trees_planted")
+  causesHelped      Int      @default(8) @map("causes_helped")
+  totalOrdersPlaced Int      @default(0) @map("total_orders_placed")
+  isBanned          Boolean  @default(false) @map("is_banned")
+  createdAt         DateTime @default(now()) @map("created_at")
 
   returns         Return[]
   p2pProducts     P2pProduct[]
   donationHistory DonationHistory[]
   purchaseHistory PurchaseHistory[]
+  orders          Order[]
+  reviews         Review[]
+  customerProfile CustomerProfile?
 
   @@map("profiles")
 }
@@ -40,13 +43,13 @@ model PurchaseHistory {
   id          String   @id @default(uuid())
   userId      String?  @map("user_id")
   itemName    String   @map("item_name")
-  category    String   // e.g. "SHOES", "APPAREL"
+  category    String // e.g. "SHOES", "APPAREL"
   sizeSystem  String   @default("IND") @map("size_system")
-  size        String   // e.g. "IND 9"
-  width       String?  // e.g. "Medium (Standard)"
+  size        String // e.g. "IND 9"
+  width       String? // e.g. "Medium (Standard)"
   purchasedAt DateTime @default(now()) @map("purchased_at")
 
-  user        Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("purchase_history")
 }
@@ -55,42 +58,42 @@ model PurchaseHistory {
 // Returns
 // ─────────────────────────────────────────────
 model Return {
-  id                String    @id
-  customerId        String?   @map("customer_id")
-  customerName      String?   @map("customer_name")
-  timeWindow        String?   @map("time_window")
-  address           String?
-  district          String?
-  itemName          String    @map("item_name")
-  category          String
-  price             Decimal   @db.Decimal(10, 2)
-  sku               String?
-  imgUrl            String?   @map("img_url")
-  reason            String?
-  comments          String?
-  status            String    @default("Pending")
-  userGrade         String?   @map("user_grade")
-  userConfidence    String?   @map("user_confidence")
-  defects           Json      @default("[]")
-  agentGrade        String    @default("") @map("agent_grade")
-  agentDefects      String    @default("") @map("agent_defects")
-  disagreementCount Int       @default(0) @map("disagreement_count")
-  downgradeRate     String?   @map("downgrade_rate")
-  routing           String?
-  riskTier          String?   @map("risk_tier")
-  trend30d          String?   @map("trend_30d")
-  flagReason        String?   @map("flag_reason")
-  aiRequestId       String?   @map("ai_request_id")
-  aiStatus          String?   @map("ai_status")
-  subcategory       String?
-  conditionAnswers  Json      @default("{}") @map("condition_answers")
-  aiNotesContradict Boolean   @default(false) @map("ai_notes_contradict")
-  aiRequiresHumanReview Boolean @default(false) @map("ai_requires_human_review")
-  refundStatus      String    @default("PENDING") @map("refund_status")
-  fraudFlagReason   String?   @map("fraud_flag_reason")
-  createdAt         DateTime  @default(now()) @map("created_at")
+  id                    String   @id
+  customerId            String?  @map("customer_id")
+  customerName          String?  @map("customer_name")
+  timeWindow            String?  @map("time_window")
+  address               String?
+  district              String?
+  itemName              String   @map("item_name")
+  category              String
+  price                 Decimal  @db.Decimal(10, 2)
+  sku                   String?
+  imgUrl                String?  @map("img_url")
+  reason                String?
+  comments              String?
+  status                String   @default("Pending")
+  userGrade             String?  @map("user_grade")
+  userConfidence        String?  @map("user_confidence")
+  defects               Json     @default("[]")
+  agentGrade            String   @default("") @map("agent_grade")
+  agentDefects          String   @default("") @map("agent_defects")
+  disagreementCount     Int      @default(0) @map("disagreement_count")
+  downgradeRate         String?  @map("downgrade_rate")
+  routing               String?
+  riskTier              String?  @map("risk_tier")
+  trend30d              String?  @map("trend_30d")
+  flagReason            String?  @map("flag_reason")
+  aiRequestId           String?  @map("ai_request_id")
+  aiStatus              String?  @map("ai_status")
+  subcategory           String?
+  conditionAnswers      Json     @default("{}") @map("condition_answers")
+  aiNotesContradict     Boolean  @default(false) @map("ai_notes_contradict")
+  aiRequiresHumanReview Boolean  @default(false) @map("ai_requires_human_review")
+  refundStatus          String   @default("PENDING") @map("refund_status")
+  fraudFlagReason       String?  @map("fraud_flag_reason")
+  createdAt             DateTime @default(now()) @map("created_at")
 
-  customer          Profile?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer Profile? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@map("returns")
 }
@@ -99,35 +102,38 @@ model Return {
 // P2P Products
 // ─────────────────────────────────────────────
 model P2pProduct {
-  id               String    @id @default(uuid())
-  title            String
-  price            Decimal   @db.Decimal(10, 2)
-  originalPrice    Decimal?  @db.Decimal(10, 2) @map("original_price")
-  category         String
-  location         String?
-  sellerId         String?   @map("seller_id")
-  sellerName       String    @map("seller_name")
-  sellerImg        String?   @map("seller_img")
+  id                String   @id @default(uuid())
+  title             String
+  price             Decimal  @db.Decimal(10, 2)
+  originalPrice     Decimal? @map("original_price") @db.Decimal(10, 2)
+  category          String
+  location          String?
+  sellerId          String?  @map("seller_id")
+  sellerName        String   @map("seller_name")
+  sellerImg         String?  @map("seller_img")
   sellerMemberSince String?  @map("seller_member_since")
-  sellerItemsCount Int       @default(0) @map("seller_items_count")
-  verified         Boolean   @default(false)
-  condition        String
-  rating           Decimal   @default(5.0) @db.Decimal(2, 1)
-  reviewsCount     Int       @default(0) @map("reviews_count")
-  description      String?
-  image            String?
-  thumbnails       Json      @default("[]")
-  timeAgo          String?   @map("time_ago")
-  lat              Float?
-  lng              Float?
-  sellerPhone      String?   @map("seller_phone")
-  aiRequestId      String?   @map("ai_request_id")
-  aiStatus         String?   @map("ai_status")
-  grade            String?
-  defects          Json      @default("[]")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  sellerItemsCount  Int      @default(0) @map("seller_items_count")
+  verified          Boolean  @default(false)
+  condition         String
+  rating            Decimal  @default(5.0) @db.Decimal(2, 1)
+  reviewsCount      Int      @default(0) @map("reviews_count")
+  description       String?
+  image             String?
+  thumbnails        Json     @default("[]")
+  timeAgo           String?  @map("time_ago")
+  lat               Float?
+  lng               Float?
+  sellerPhone       String?  @map("seller_phone")
+  aiRequestId       String?  @map("ai_request_id")
+  aiStatus          String?  @map("ai_status")
+  grade             String?
+  defects           Json     @default("[]")
+  photos            Json     @default("{}")
+  subcategory       String?
+  conditionAnswers  Json     @default("{}") @map("condition_answers")
+  createdAt         DateTime @default(now()) @map("created_at")
 
-  seller           Profile?  @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  seller Profile? @relation(fields: [sellerId], references: [id], onDelete: SetNull)
 
   @@map("p2p_products")
 }
@@ -136,16 +142,16 @@ model P2pProduct {
 // P2P Chats
 // ─────────────────────────────────────────────
 model P2pChat {
-  id          String       @id @default(uuid())
-  category    String       @default("buying")
-  itemTitle   String       @map("item_title")
-  itemPrice   Decimal      @db.Decimal(10, 2) @map("item_price")
-  itemImage   String?      @map("item_image")
-  senderName  String?      @map("sender_name")
-  senderImg   String?      @map("sender_img")
-  createdAt   DateTime     @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  category   String   @default("buying")
+  itemTitle  String   @map("item_title")
+  itemPrice  Decimal  @map("item_price") @db.Decimal(10, 2)
+  itemImage  String?  @map("item_image")
+  senderName String?  @map("sender_name")
+  senderImg  String?  @map("sender_img")
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  messages    P2pMessage[]
+  messages P2pMessage[]
 
   @@map("p2p_chats")
 }
@@ -161,7 +167,7 @@ model P2pMessage {
   isMe       Boolean  @default(false) @map("is_me")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  chat       P2pChat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chat P2pChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@map("p2p_messages")
 }
@@ -170,20 +176,20 @@ model P2pMessage {
 // NGO Campaigns
 // ─────────────────────────────────────────────
 model NgoCampaign {
-  id          String   @id @default(uuid())
-  title       String
-  ngoName     String   @map("ngo_name")
-  ngoLogo     String?  @map("ngo_logo")
-  description String?
-  image       String?
-  urgency     String   @default("standard")
-  category    String
-  progress    Int      @default(0)
-  received    Decimal  @default(0) @db.Decimal(10, 2)
-  target      Decimal  @db.Decimal(10, 2)
-  unit        String
-  location    String?
-  state       String?
+  id                 String   @id @default(uuid())
+  title              String
+  ngoName            String   @map("ngo_name")
+  ngoLogo            String?  @map("ngo_logo")
+  description        String?
+  image              String?
+  urgency            String   @default("standard")
+  category           String
+  progress           Int      @default(0)
+  received           Decimal  @default(0) @db.Decimal(10, 2)
+  target             Decimal  @db.Decimal(10, 2)
+  unit               String
+  location           String?
+  state              String?
   founder            String?  @map("founder")
   contactPerson      String?  @map("contact_person")
   contactEmail       String?  @map("contact_email")
@@ -192,7 +198,7 @@ model NgoCampaign {
   foundedYear        Int?     @map("founded_year")
   address            String?
   missionStatement   String?  @map("mission_statement")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   @@map("ngo_campaigns")
 }
@@ -211,7 +217,7 @@ model DonationHistory {
   isMe      Boolean  @default(true) @map("is_me")
   createdAt DateTime @default(now()) @map("created_at")
 
-  user      Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("donation_history")
 }
@@ -228,4 +234,94 @@ model Leaderboard {
   score         Int    @default(0)
 
   @@map("leaderboard")
+}
+
+// ─────────────────────────────────────────────
+// E-commerce Sizing Models
+// ─────────────────────────────────────────────
+
+model Order {
+  orderId    String   @id @default(uuid()) @map("order_id")
+  customerId String   @map("customer_id")
+  productId  String   @map("product_id")
+  variantId  String   @map("variant_id")
+  orderDate  DateTime @default(now()) @map("order_date")
+  price      Decimal  @db.Decimal(10, 2)
+
+  customer Profile         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  variant  ProductVariant  @relation(fields: [variantId], references: [variantId], onDelete: Cascade)
+  returns  EcommerceReturn[]
+
+  @@map("orders")
+}
+
+model EcommerceReturn {
+  returnId             String   @id @default(uuid()) @map("return_id")
+  orderId              String   @map("order_id")
+  returnReason         String   @map("return_reason")
+  returnDate           DateTime @default(now()) @map("return_date")
+  exchangedToVariantId String?  @map("exchanged_to_variant_id")
+
+  order              Order           @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  exchangedToVariant ProductVariant? @relation("ExchangeVariant", fields: [exchangedToVariantId], references: [variantId], onDelete: SetNull)
+
+  @@map("ecommerce_returns")
+}
+
+model Review {
+  reviewId         String   @id @default(uuid()) @map("review_id")
+  orderId          String?  @map("order_id")
+  customerId       String   @map("customer_id")
+  productId        String   @map("product_id")
+  rating           Int
+  title            String   @default("") @map("title")
+  reviewText       String   @map("review_text")
+  reviewDate       DateTime @default(now()) @map("review_date")
+  variantId        String?  @map("variant_id")
+  verifiedPurchase Boolean  @default(true) @map("verified_purchase")
+  helpfulVotes     Int      @default(0) @map("helpful_votes")
+  photoUrl         String?  @map("photo_url")
+  videoUrl         String?  @map("video_url")
+  videoDuration    String?  @map("video_duration")
+
+  customer Profile         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  variant  ProductVariant? @relation(fields: [variantId], references: [variantId], onDelete: SetNull)
+
+  @@map("reviews")
+}
+
+model CustomerProfile {
+  customerId        String   @id @map("customer_id")
+  footLengthCm      Float?   @map("foot_length_cm")
+  footWidth         String?  @map("foot_width")
+  shoeSizeSelected  String?  @map("shoe_size_selected")
+  chestCm           Float?   @map("chest_cm")
+  heightCm          Float?   @map("height_cm")
+  weightKg          Float?   @map("weight_kg")
+  user              Profile  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_profile")
+}
+
+model ProductVariant {
+  variantId    String @id @default(uuid()) @map("variant_id")
+  productId    String @map("product_id")
+  sizeLabel    String @map("size_label")
+  sizeNumeric  Float  @map("size_numeric")
+
+  orders    Order[]
+  exchanges EcommerceReturn[] @relation("ExchangeVariant")
+  reviews   Review[]
+
+  @@map("product_variants")
+}
+
+model ProductReviewSizingSignal {
+  productId             String   @id @map("product_id")
+  sentiment             String
+  pctOfReviews          Float    @map("pct_of_reviews")
+  sampleReviewSnippet   String   @map("sample_review_snippet")
+  lastUpdated           DateTime @default(now()) @updatedAt @map("last_updated")
+
+  @@map("product_review_sizing_signals")
 }

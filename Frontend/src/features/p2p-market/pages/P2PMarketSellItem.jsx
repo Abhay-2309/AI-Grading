@@ -1,32 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import LocationPill from '../components/LocationPill';
+import SellerAiInspection from '../components/SellerAiInspection';
 import { apiFetch } from '../../../services/api';
 
 const LISTING_FEE_CREDITS = 20;
-
-// Downscales the chosen photo client-side and returns it as a data URI —
-// there's no image-hosting backend for P2P listings, so the data URI *is*
-// the stored image (fully self-contained, works everywhere on reload).
-function resizeImageToDataUrl(file, maxDim = 800, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(objectUrl);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = (err) => {
-      URL.revokeObjectURL(objectUrl);
-      reject(err);
-    };
-    img.src = objectUrl;
-  });
-}
 
 export default function P2PMarketSellItem({
   onAddProduct,
@@ -34,143 +11,76 @@ export default function P2PMarketSellItem({
   onDetectLocation,
   greenCredits,
   onNavigate,
-  onExit
+  onExit,
+  subcategoryTaxonomy,
 }) {
-  // Wizard state
-  const [step, setStep] = useState(0); // 0: Choose Category, 1: Details, 2: AI Grading, 3: Shipping
+  // Wizard steps:
+  // 0 = Choose Category
+  // 1 = Listing Details (title, price, description, phone — no photo)
+  // 2 = AI Photo Inspection (SellerAiInspection — multi-angle photos + questions)
+  // 3 = Shipping & Publish
+  const [step, setStep] = useState(0);
 
-  // Form fields — genuinely blank so the wizard never shows example content
+  // Form fields
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Electronics');
   const [price, setPrice] = useState('');
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
-  const [photoError, setPhotoError] = useState('');
-  const photoInputRef = useRef(null);
 
-  // AI Grading state
+  // Created product (after step 1 submits to backend)
   const [createdProduct, setCreatedProduct] = useState(null);
-  const [gradingPhase, setGradingPhase] = useState('idle'); // 'idle' | 'grading' | 'completed' | 'failed'
-  const [statusText, setStatusText] = useState('');
-  const [failureReason, setFailureReason] = useState('');
-  const [aiReport, setAiReport] = useState(null);
-
-  const mapGradeToCondition = (grade) => {
-    if (!grade) return 'Good';
-    const g = grade.toUpperCase();
-    if (g.startsWith('A+')) return 'New (Sealed)';
-    if (g.startsWith('A')) return 'Like New';
-    if (g.startsWith('B')) return 'Very Good';
-    if (g.startsWith('C')) return 'Good';
-    if (g.startsWith('D')) return 'Acceptable';
-    return 'Unsalvageable';
-  };
-
-  const startAiGrading = async (productId) => {
-    setGradingPhase('grading');
-    setFailureReason('');
-    setStatusText('SUBMITTING PHOTOS — 10%');
-
-    try {
-      const submitResult = await apiFetch(`/api/grading/p2p/${productId}/submit`, { method: 'POST' });
-      if (submitResult.status === 'FAILED') {
-        setFailureReason(submitResult.failureReason || 'Photo quality check failed.');
-        setGradingPhase('failed');
-        return;
-      }
-
-      setStatusText('ANALYZING — 60%');
-      let ok = false;
-      let failMsg = 'Grading is taking longer than expected.';
-      for (let i = 0; i < 72; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        const status = await apiFetch(`/api/grading/p2p/${productId}/status`);
-        setStatusText(`${status.status} — ${status.progress}%`);
-        if (status.status === 'COMPLETED') {
-          ok = true;
-          break;
-        }
-        if (status.status === 'FAILED') {
-          ok = false;
-          failMsg = status.failureReason || 'Photo grading failed.';
-          break;
-        }
-      }
-
-      if (!ok) {
-        setFailureReason(failMsg);
-        setGradingPhase('failed');
-        return;
-      }
-
-      const resultBody = await apiFetch(`/api/grading/p2p/${productId}/result`);
-      setAiReport(resultBody.report);
-      setGradingPhase('completed');
-    } catch (err) {
-      setFailureReason(err.message || 'Failed to reach the grading service.');
-      setGradingPhase('failed');
-    }
-  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     onNavigate('search', { query: searchQuery });
   };
 
+  // Step 1 → Step 2: create product in DB first, then open AI inspection
+  const handleNextFromDetails = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    setPublishError('');
+    const newProduct = {
+      title,
+      price: parseFloat(price) || 0,
+      originalPrice: parseFloat(price) ? parseFloat(price) * 1.2 : 0,
+      category,
+      location: userLocation?.status === 'done' ? userLocation.label : 'India',
+      lat: userLocation?.status === 'done' ? userLocation.lat : null,
+      lng: userLocation?.status === 'done' ? userLocation.lng : null,
+      sellerPhone: phone || null,
+      seller: 'Me',
+      verified: false,
+      condition: 'Good',
+      timeAgo: 'Just now',
+      rating: 5.0,
+      reviewsCount: 0,
+      description,
+      image: '',
+      thumbnails: [],
+    };
+
+    try {
+      const created = await onAddProduct(newProduct);
+      setCreatedProduct(created);
+      setStep(2);
+    } catch (err) {
+      setPublishError(err.message || 'Failed to create product listing.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleNextStep = async () => {
-    if (step === 0) {
-      setStep(1);
-      return;
-    }
-
-    if (step === 1) {
-      if (publishing) return;
-      setPublishing(true);
-      setPublishError('');
-      const newProduct = {
-        title,
-        price: parseFloat(price) || 0,
-        originalPrice: parseFloat(price) ? parseFloat(price) * 1.2 : 0,
-        category,
-        location: userLocation?.status === 'done' ? userLocation.label : 'India',
-        lat: userLocation?.status === 'done' ? userLocation.lat : null,
-        lng: userLocation?.status === 'done' ? userLocation.lng : null,
-        sellerPhone: phone || null,
-        seller: 'Me',
-        verified: false,
-        condition: 'Like New',
-        timeAgo: 'Just now',
-        rating: 5.0,
-        reviewsCount: 0,
-        description,
-        image,
-        thumbnails: [],
-      };
-
-      try {
-        const created = await onAddProduct(newProduct);
-        setCreatedProduct(created);
-        setStep(2);
-        startAiGrading(created.id);
-      } catch (err) {
-        setPublishError(err.message || 'Failed to create product listing.');
-      } finally {
-        setPublishing(false);
-      }
-      return;
-    }
-
-    if (step === 2) {
-      setStep(3);
-      return;
-    }
-
+    if (step === 0) { setStep(1); return; }
+    if (step === 1) { await handleNextFromDetails(); return; }
+    if (step === 2) { setStep(3); return; }
     if (step === 3) {
       if (publishing) return;
       setPublishing(true);
@@ -184,13 +94,9 @@ export default function P2PMarketSellItem({
   };
 
   const handleBackStep = () => {
-    if (step === 3) {
-      setStep(2);
-    } else if (step === 2) {
-      setStep(1);
-    } else if (step === 1) {
-      setStep(0);
-    }
+    if (step === 3) setStep(2);
+    else if (step === 2) setStep(1);
+    else if (step === 1) setStep(0);
   };
 
   const handleCategorySelect = (selectedCat) => {
@@ -198,40 +104,24 @@ export default function P2PMarketSellItem({
     setStep(1);
   };
 
-  const triggerPhotoUpload = () => {
-    photoInputRef.current?.click();
-  };
+  const canProceedFromDetails = Boolean(title.trim() && parseFloat(price) > 0);
 
-  const handlePhotoSelect = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setPhotoError('');
-    try {
-      const dataUrl = await resizeImageToDataUrl(file);
-      setImage(dataUrl);
-    } catch {
-      setPhotoError('Failed to load that photo. Please try a different file.');
-    }
-  };
-
-  const canProceedFromDetails = Boolean(title.trim() && parseFloat(price) > 0 && image);
-
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
-      {/* TopNavBar */}
+      {/* ── Top Navigation ──────────────────────────────────────────────────── */}
       <header className="bg-[#232F3E] text-white sticky top-0 z-50 shadow-md">
-        {/* Upper Bar */}
+        {/* Upper bar */}
         <div className="flex justify-between items-center w-full px-6 py-2.5 gap-6 max-w-[1440px] mx-auto">
-          {/* Brand Logo */}
-          <button 
-            onClick={() => onNavigate('home')} 
+          {/* Brand */}
+          <button
+            onClick={() => onNavigate('home')}
             className="text-xl md:text-2xl font-black text-white hover:text-orange-400 transition-colors bg-transparent border-none cursor-pointer focus:outline-none shrink-0"
           >
             MarketConnect
           </button>
 
-          {/* Search Bar */}
+          {/* Search */}
           <form onSubmit={handleSearchSubmit} className="flex-grow max-w-2xl">
             <div className="flex items-center">
               <input
@@ -241,7 +131,7 @@ export default function P2PMarketSellItem({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button 
+              <button
                 type="submit"
                 className="bg-[#febd69] hover:bg-[#f3a847] text-[#111111] px-5 py-2.5 rounded-r-md flex items-center justify-center transition-colors border-none cursor-pointer shrink-0"
               >
@@ -250,28 +140,24 @@ export default function P2PMarketSellItem({
             </div>
           </form>
 
-          {/* Actions Cluster */}
+          {/* Actions cluster */}
           <div className="flex items-center gap-6 shrink-0">
-            {/* Location */}
             <LocationPill userLocation={userLocation} onDetectLocation={onDetectLocation} />
 
-            {/* Hello, Sign in */}
             <div className="hidden md:flex flex-col items-start leading-tight cursor-pointer hover:border hover:border-white p-1 rounded transition-all">
               <span className="text-[10px] opacity-75">Hello, Sign in</span>
-              <span className="text-xs font-bold">Account & Lists</span>
+              <span className="text-xs font-bold">Account &amp; Lists</span>
             </div>
 
-            {/* Returns & Orders */}
-            <button 
+            <button
               onClick={() => onNavigate('home')}
               className="bg-transparent border-none text-white hidden md:flex flex-col items-start leading-tight cursor-pointer hover:border hover:border-white p-1 rounded transition-all text-left focus:outline-none"
             >
               <span className="text-[10px] opacity-75">Returns</span>
-              <span className="text-xs font-bold">& Orders</span>
+              <span className="text-xs font-bold">&amp; Orders</span>
             </button>
 
-            {/* Chat Link */}
-            <button 
+            <button
               onClick={() => onNavigate('messages')}
               className="bg-transparent border-none text-white flex flex-col items-center cursor-pointer hover:text-orange-400 transition-all focus:outline-none p-1"
             >
@@ -279,17 +165,15 @@ export default function P2PMarketSellItem({
               <span className="text-[10px] font-bold mt-0.5">Chat</span>
             </button>
 
-            {/* User Profile Avatar */}
             <div className="w-9 h-9 rounded-full border-2 border-[#febd69] overflow-hidden shrink-0 cursor-pointer">
-              <img 
-                className="w-full h-full object-cover" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCT9c2SyWdJm1WQnazqi8D3rkYonHWiVxVV2SRGPXh3UyIC0lShKamMfyOxom6kPDdDmYlgIFcCsKixg28TjNyZYvf3CUUMsfqSxOMqnzpXmDT9uihEX8H2aEcSrlv-C6LVLmwpOyRm5KtYb0-hTwZKEeeOFvYQivBnkOALPM759biUUjfax6Vck7rzyqTTKOb6nQ0FAfl4Ml32tIj6BKontw1nnEOCh6FfCb-evQVOY8sg7ToqfAly7Q" 
-                alt="Profile Avatar" 
+              <img
+                className="w-full h-full object-cover"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCT9c2SyWdJm1WQnazqi8D3rkYonHWiVxVV2SRGPXh3UyIC0lShKamMfyOxom6kPDdDmYlgIFcCsKixg28TjNyZYvf3CUUMsfqSxOMqnzpXmDT9uihEX8H2aEcSrlv-C6LVLmwpOyRm5KtYb0-hTwZKEeeOFvYQivBnkOALPM759biUUjfax6Vck7rzyqTTKOb6nQ0FAfl4Ml32tIj6BKontw1nnEOCh6FfCb-evQVOY8sg7ToqfAly7Q"
+                alt="Profile Avatar"
               />
             </div>
 
-            {/* Sell Pill Button */}
-            <button 
+            <button
               onClick={() => onNavigate('sell')}
               className="bg-gradient-to-r from-amber-400 via-emerald-400 to-blue-600 p-[2px] rounded-full hover:scale-105 transition-all cursor-pointer border-none shadow"
             >
@@ -299,8 +183,7 @@ export default function P2PMarketSellItem({
               </div>
             </button>
 
-            {/* Exit Portal */}
-            <button 
+            <button
               onClick={onExit}
               className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1 cursor-pointer border-none shadow-sm"
             >
@@ -310,10 +193,10 @@ export default function P2PMarketSellItem({
           </div>
         </div>
 
-        {/* Lower Navigation links (Light Grey bg) */}
+        {/* Lower nav */}
         <div className="bg-[#eaeded] border-b border-slate-200 py-1.5 text-slate-700">
           <div className="max-w-[1440px] mx-auto flex items-center gap-6 px-6 overflow-x-auto scrollbar-none">
-            <button 
+            <button
               onClick={() => onNavigate('home')}
               className="flex items-center gap-1 text-slate-800 font-bold hover:text-orange-600 text-xs bg-transparent border-none cursor-pointer focus:outline-none"
             >
@@ -326,7 +209,7 @@ export default function P2PMarketSellItem({
                 { label: 'Fashion', catValue: 'Fashion' },
                 { label: 'Electronics', catValue: 'Electronics' },
                 { label: 'Home', catValue: 'Furniture' },
-                { label: 'Sports', catValue: 'Photography' }
+                { label: 'Sports', catValue: 'Photography' },
               ].map((item) => (
                 <button
                   key={item.label}
@@ -342,11 +225,9 @@ export default function P2PMarketSellItem({
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* ── Step 0: Choose Category ──────────────────────────────────────────── */}
       {step === 0 ? (
-        /* Choose Category Screen */
         <main className="flex-grow w-full px-4 py-10 flex flex-col items-center bg-slate-50">
-          {/* Hero Header */}
           <div className="text-center mb-8">
             <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-wide uppercase mb-2">
               Post Your Ad
@@ -355,25 +236,23 @@ export default function P2PMarketSellItem({
           </div>
 
           <div className="w-full max-w-2xl">
-            {/* Category Header */}
             <div className="flex items-center justify-between mb-4 px-1">
               <h2 className="text-xs font-black text-slate-600 uppercase tracking-widest">Choose a Category</h2>
               <span className="text-[10px] text-slate-400 font-medium">10 categories</span>
             </div>
 
-            {/* 2-column Grid */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Cars',                       icon: 'directions_car',  cat: 'Sports & Outdoors',  color: 'bg-blue-100 text-blue-600',       popular: true  },
-                { label: 'Properties',                 icon: 'domain',          cat: 'Home & Furniture',   color: 'bg-emerald-100 text-emerald-600', popular: false },
-                { label: 'Mobiles',                    icon: 'smartphone',      cat: 'Electronics',        color: 'bg-violet-100 text-violet-600',   popular: true  },
-                { label: 'Jobs',                       icon: 'work',            cat: 'Electronics',        color: 'bg-amber-100 text-amber-600',     popular: false },
-                { label: 'Bikes',                      icon: 'two_wheeler',     cat: 'Sports & Outdoors',  color: 'bg-orange-100 text-orange-600',   popular: false },
-                { label: 'Electronics & Appliances',   icon: 'tv',              cat: 'Electronics',        color: 'bg-cyan-100 text-cyan-600',       popular: true  },
-                { label: 'Commercial Vehicles',        icon: 'local_shipping',  cat: 'Sports & Outdoors',  color: 'bg-slate-100 text-slate-600',     popular: false },
-                { label: 'Furniture',                  icon: 'chair',           cat: 'Home & Furniture',   color: 'bg-lime-100 text-lime-700',       popular: false },
-                { label: 'Fashion',                    icon: 'checkroom',       cat: 'Fashion',            color: 'bg-pink-100 text-pink-600',       popular: true  },
-                { label: 'Books & Hobbies',            icon: 'sports_soccer',   cat: 'Sports & Outdoors',  color: 'bg-teal-100 text-teal-600',       popular: false },
+                { label: 'Cars',                      icon: 'directions_car',  cat: 'Sports & Outdoors',  color: 'bg-blue-100 text-blue-600',       popular: true  },
+                { label: 'Properties',                icon: 'domain',          cat: 'Home & Furniture',   color: 'bg-emerald-100 text-emerald-600', popular: false },
+                { label: 'Mobiles',                   icon: 'smartphone',      cat: 'Electronics',        color: 'bg-violet-100 text-violet-600',   popular: true  },
+                { label: 'Jobs',                      icon: 'work',            cat: 'Electronics',        color: 'bg-amber-100 text-amber-600',     popular: false },
+                { label: 'Bikes',                     icon: 'two_wheeler',     cat: 'Sports & Outdoors',  color: 'bg-orange-100 text-orange-600',   popular: false },
+                { label: 'Electronics & Appliances',  icon: 'tv',              cat: 'Electronics',        color: 'bg-cyan-100 text-cyan-600',       popular: true  },
+                { label: 'Commercial Vehicles',       icon: 'local_shipping',  cat: 'Sports & Outdoors',  color: 'bg-slate-100 text-slate-600',     popular: false },
+                { label: 'Furniture',                 icon: 'chair',           cat: 'Home & Furniture',   color: 'bg-lime-100 text-lime-700',       popular: false },
+                { label: 'Fashion',                   icon: 'checkroom',       cat: 'Fashion',            color: 'bg-pink-100 text-pink-600',       popular: true  },
+                { label: 'Books & Hobbies',           icon: 'menu_book',       cat: 'Books & Hobbies',    color: 'bg-teal-100 text-teal-600',       popular: false },
               ].map((item) => (
                 <button
                   key={item.label}
@@ -381,26 +260,20 @@ export default function P2PMarketSellItem({
                   onClick={() => handleCategorySelect(item.cat)}
                   className="relative bg-white rounded-xl border border-slate-200 hover:border-orange-400 hover:shadow-md p-4 flex items-center gap-3 text-left cursor-pointer group transition-all duration-150 hover:-translate-y-0.5 shadow-sm"
                 >
-                  {/* Colored Icon Badge */}
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${item.color} group-hover:scale-110 transition-transform`}>
                     <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>{item.icon}</span>
                   </div>
-
-                  {/* Label */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-700 group-hover:text-orange-600 transition-colors leading-tight truncate">{item.label}</p>
                     {item.popular && (
                       <span className="inline-block mt-1 text-[9px] font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">Popular</span>
                     )}
                   </div>
-
-                  {/* Chevron */}
                   <span className="material-symbols-outlined text-slate-300 group-hover:text-orange-400 text-base shrink-0 transition-colors">chevron_right</span>
                 </button>
               ))}
             </div>
 
-            {/* Help footer */}
             <div className="mt-6 bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-start gap-3 shadow-sm">
               <span className="material-symbols-outlined text-orange-500 text-[20px] shrink-0 mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>help</span>
               <div>
@@ -410,40 +283,37 @@ export default function P2PMarketSellItem({
             </div>
           </div>
         </main>
+
       ) : (
-        /* Regular Wizard Flow */
+        /* ── Steps 1–3: Wizard flow ─────────────────────────────────────────── */
         <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-6 py-8">
-          {/* Multistep Header */}
+          {/* Stepper header */}
           <div className="max-w-3xl mx-auto mb-8 text-center">
             <h1 className="text-lg md:text-xl font-extrabold text-slate-800 mb-6">Create a New Listing</h1>
-            {/* Stepper Indicators */}
             <div className="flex items-center justify-between px-6 md:px-12">
+              {/* Step 1 */}
               <div className="flex flex-col items-center gap-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                  step >= 1 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'
-                }`}>1</div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 1 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'}`}>1</div>
                 <span className={`text-[10px] font-bold ${step >= 1 ? 'text-orange-600' : 'text-slate-400'}`}>Details</span>
               </div>
-              <div className={`h-0.5 flex-grow mx-4 ${step >= 2 ? 'bg-orange-500' : 'bg-slate-200'}`}></div>
-              
-              <div className="flex flex-col items-center gap-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                  step >= 2 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'
-                }`}>2</div>
-                <span className={`text-[10px] font-bold ${step >= 2 ? 'text-orange-600' : 'text-slate-400'}`}>Shipping</span>
-              </div>
-              <div className={`h-0.5 flex-grow mx-4 ${step >= 3 ? 'bg-orange-500' : 'bg-slate-200'}`}></div>
+              <div className={`h-0.5 flex-grow mx-4 ${step >= 2 ? 'bg-orange-500' : 'bg-slate-200'}`} />
 
+              {/* Step 2 */}
               <div className="flex flex-col items-center gap-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                  step >= 3 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'
-                }`}>3</div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 2 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'}`}>2</div>
+                <span className={`text-[10px] font-bold ${step >= 2 ? 'text-orange-600' : 'text-slate-400'}`}>AI Inspection</span>
+              </div>
+              <div className={`h-0.5 flex-grow mx-4 ${step >= 3 ? 'bg-orange-500' : 'bg-slate-200'}`} />
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center gap-1">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 3 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'}`}>3</div>
                 <span className={`text-[10px] font-bold ${step >= 3 ? 'text-orange-600' : 'text-slate-400'}`}>Publish</span>
               </div>
             </div>
           </div>
 
-          {/* Success Alert Banner */}
+          {/* Success banner */}
           {successMsg && (
             <div className="max-w-6xl mx-auto mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3 text-green-800 text-sm font-bold shadow-sm justify-center">
               <span className="material-symbols-outlined text-green-600 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -451,15 +321,27 @@ export default function P2PMarketSellItem({
             </div>
           )}
 
-          {/* Form & Live Preview Grid */}
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left">
-            {/* Left Side: Form */}
+            {/* ── Left: Form panel ──────────────────────────────────────────── */}
             <section className="lg:col-span-7 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+
+              {/* ── Step 1: Listing Details ──────────────────────────────────── */}
               {step === 1 && (
                 <form className="space-y-6">
+                  {/* AI Inspection notice */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-blue-500 text-[20px] shrink-0 mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                    <div>
+                      <p className="text-xs font-bold text-blue-800">AI Photo Inspection — Next Step</p>
+                      <p className="text-[11px] text-blue-600 mt-0.5 leading-relaxed">
+                        After filling in your listing details, you'll upload multiple product photos for our AI to analyse. The AI will grade your item and detect any damage so buyers trust your listing.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Listing Title</label>
-                    <input 
+                    <input
                       className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-800"
                       placeholder="e.g. Vintage 35mm Camera"
                       type="text"
@@ -468,31 +350,25 @@ export default function P2PMarketSellItem({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Category</label>
-                      <select 
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-700 cursor-pointer"
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                      >
-                        <option>Electronics</option>
-                        <option>Photography</option>
-                        <option>Fashion</option>
-                        <option>Home &amp; Furniture</option>
-                        <option>Sports &amp; Outdoors</option>
-                      </select>
+                  {/* Category is chosen in Step 0 — show it read-only */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Category</label>
+                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                      <span className="material-symbols-outlined text-orange-500 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>sell</span>
+                      <span className="text-xs font-bold text-orange-700">{category}</span>
+                      <span className="ml-auto text-[10px] text-orange-400">Selected in Step 0</span>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price (₹)</label>
-                      <input 
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-800"
-                        placeholder="0.00"
-                        type="number"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                      />
-                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price (₹)</label>
+                    <input
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-800"
+                      placeholder="0.00"
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-1.5">
@@ -509,148 +385,33 @@ export default function P2PMarketSellItem({
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Description</label>
-                    <textarea 
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-800 resize-none" 
-                      placeholder="Describe the item's condition, features, why you are selling..." 
+                    <textarea
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none text-slate-800 resize-none"
+                      placeholder="Describe the item's condition, features, why you are selling..."
                       rows="4"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                    ></textarea>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Photo Gallery</label>
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handlePhotoSelect}
                     />
-                    <div className="grid grid-cols-3 gap-3">
-                      {!image ? (
-                        <div
-                          className="aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl flex flex-col justify-center items-center gap-1 text-slate-400 hover:bg-slate-100/50 hover:border-orange-400 hover:text-orange-500 transition-all cursor-pointer"
-                          onClick={triggerPhotoUpload}
-                        >
-                          <span className="material-symbols-outlined text-[20px]">add_a_photo</span>
-                          <span className="text-[8px] font-bold">Add Photo</span>
-                        </div>
-                      ) : (
-                        <div className="aspect-square bg-slate-100 rounded-xl relative border border-slate-200">
-                          <img className="w-full h-full object-cover rounded-xl" alt="Listing" src={image} />
-                          <span
-                            onClick={() => setImage('')}
-                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 text-[10px] material-symbols-outlined cursor-pointer hover:bg-black"
-                          >
-                            close
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {photoError && <p className="text-[10px] text-red-600 font-semibold">{photoError}</p>}
-                    {!image && <p className="text-[10px] text-slate-400">A listing needs at least one photo before it can be published.</p>}
                   </div>
                 </form>
               )}
 
+              {/* ── Step 2: AI Photo Inspection ──────────────────────────────── */}
               {step === 2 && (
-                <div className="space-y-6 py-6 text-center">
-                  {gradingPhase === 'grading' && (
-                    <div className="space-y-4">
-                      <div className="flex flex-col items-center justify-center space-y-3">
-                        <span className="material-symbols-outlined text-[64px] text-orange-500 animate-spin">sync</span>
-                        <h3 className="text-base font-bold text-slate-800 font-sans">AI Vision Inspection in Progress</h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          Our Computer Vision engine is evaluating your item for category verification and physical defects.
-                        </p>
-                      </div>
-                      <div className="max-w-xs mx-auto bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div className="bg-orange-500 h-full transition-all duration-500" style={{ width: statusText.includes('60%') ? '60%' : statusText.includes('10%') ? '10%' : '80%' }}></div>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-600">{statusText}</p>
-                    </div>
-                  )}
-
-                  {gradingPhase === 'failed' && (
-                    <div className="space-y-4 text-center">
-                      <span className="material-symbols-outlined text-[64px] text-red-500">warning</span>
-                      <h3 className="text-base font-bold text-slate-800 font-sans">Inspection Rejected</h3>
-                      <p className="text-xs font-semibold text-red-650 max-w-[384px] mx-auto bg-red-50 border border-red-200 rounded-lg p-3">
-                        {failureReason}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep(1);
-                          setGradingPhase('idle');
-                        }}
-                        className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                        Retake Photo / Change Details
-                      </button>
-                    </div>
-                  )}
-
-                  {gradingPhase === 'completed' && aiReport && (
-                    <div className="space-y-6 text-left max-w-md mx-auto">
-                      <div className="text-center space-y-2">
-                        <span className="material-symbols-outlined text-[64px] text-green-500">verified_user</span>
-                        <h3 className="text-base font-bold text-slate-800 font-sans">AI Verification Successful!</h3>
-                        <p className="text-xs text-slate-500">We have successfully verified and graded your item.</p>
-                      </div>
-
-                      <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100 space-y-3">
-                        <div className="flex justify-between items-center pb-2 border-b border-emerald-100">
-                          <span className="text-xs text-slate-600 font-semibold">Assigned Quality Grade:</span>
-                          <span className="bg-emerald-600 text-white text-xs font-extrabold px-2.5 py-0.5 rounded shadow-sm">
-                            GRADE {aiReport.grade}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center pb-2 border-b border-emerald-100">
-                          <span className="text-xs text-slate-600 font-semibold">Condition Rating:</span>
-                          <span className="text-xs font-extrabold text-slate-800">{mapGradeToCondition(aiReport.grade)}</span>
-                        </div>
-
-                        {aiReport.damages && aiReport.damages.length > 0 ? (
-                          <div className="pt-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 font-sans">Detected Flaws / Damages:</span>
-                            <ul className="list-disc list-inside text-xs text-slate-650 space-y-1">
-                              {aiReport.damages.map((d, idx) => (
-                                <li key={idx}>
-                                  <span className="font-bold text-slate-800">{d.defect_type || d.type}</span>: {d.description || d.desc}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-emerald-700 font-bold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[16px] text-emerald-650">check_circle</span>
-                            No physical defects detected! Perfect condition.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex justify-end pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setStep(3)}
-                          className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow"
-                        >
-                          Continue to Shipping
-                          <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SellerAiInspection
+                  productId={createdProduct?.id}
+                  category={category}
+                  subcategoryTaxonomy={subcategoryTaxonomy}
+                  onNext={() => setStep(3)}
+                  onBack={() => setStep(1)}
+                />
               )}
 
+              {/* ── Step 3: Shipping & Publish ────────────────────────────────── */}
               {step === 3 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-slate-800 font-sans">Choose Shipping & Meetup Options</h3>
+                    <h3 className="text-sm font-bold text-slate-800 font-sans">Choose Shipping &amp; Meetup Options</h3>
                     <p className="text-xs text-slate-500">Enable how you prefer buyers to receive your item. We recommend enabling both for maximum coverage.</p>
                   </div>
 
@@ -712,30 +473,32 @@ export default function P2PMarketSellItem({
                 </div>
               )}
 
-              {/* Form actions navigation */}
-              <div className="pt-6 border-t border-slate-100 flex justify-between items-center mt-6">
-                <button 
-                  type="button"
-                  onClick={handleBackStep}
-                  disabled={step === 0 || (step === 2 && gradingPhase === 'grading')}
-                  className="px-5 py-2 border border-slate-300 rounded-lg font-bold text-xs text-slate-650 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Back
-                </button>
-                {step !== 2 && (
+              {/* ── Nav buttons (only shown for steps 1 & 3; step 2 manages its own) */}
+              {step !== 2 && (
+                <div className="pt-6 border-t border-slate-100 flex justify-between items-center mt-6">
+                  <button
+                    type="button"
+                    onClick={handleBackStep}
+                    disabled={step === 0}
+                    className="px-5 py-2 border border-slate-300 rounded-lg font-bold text-xs text-slate-650 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Back
+                  </button>
                   <button
                     type="button"
                     onClick={handleNextStep}
                     disabled={publishing || (step === 1 && !canProceedFromDetails)}
                     className="px-6 py-2 bg-orange-500 text-white rounded-lg font-bold text-xs hover:bg-orange-600 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {step === 3 ? (publishing ? 'Publishing...' : `Publish Listing (${LISTING_FEE_CREDITS} credits)`) : 'Next Step'}
+                    {step === 3
+                      ? (publishing ? 'Publishing...' : `Publish Listing (${LISTING_FEE_CREDITS} credits)`)
+                      : (publishing ? 'Saving...' : 'Next Step')}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </section>
 
-            {/* Right Side: Live Preview */}
+            {/* ── Right: Live Preview ────────────────────────────────────────── */}
             <aside className="lg:col-span-5 flex flex-col gap-4 sticky top-24 h-fit">
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Preview</span>
@@ -744,18 +507,14 @@ export default function P2PMarketSellItem({
                   Updating live
                 </span>
               </div>
-              
+
               <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm text-left">
-                {/* Preview Image */}
+                {/* Preview image slot */}
                 <div className="relative w-full aspect-video bg-slate-100 flex items-center justify-center p-2">
-                  {image ? (
-                    <img className="max-h-full max-w-full object-contain rounded" alt="Preview" src={image} />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1 text-slate-350">
-                      <span className="material-symbols-outlined text-[32px]">image</span>
-                      <span className="text-[10px] font-bold">No photo yet</span>
-                    </div>
-                  )}
+                  <div className="flex flex-col items-center gap-2 text-slate-300">
+                    <span className="material-symbols-outlined text-[40px]">photo_camera</span>
+                    <span className="text-[10px] font-bold">Photos added in AI Inspection step</span>
+                  </div>
                   <div className="absolute top-3 right-3 bg-white/90 shadow rounded-full p-1.5 text-slate-400">
                     <span className="material-symbols-outlined text-[18px]">favorite</span>
                   </div>
@@ -764,7 +523,7 @@ export default function P2PMarketSellItem({
                   </div>
                 </div>
 
-                {/* Preview Content */}
+                {/* Preview content */}
                 <div className="p-5 space-y-3.5">
                   <div className="flex justify-between items-start gap-4">
                     <div>
@@ -773,7 +532,7 @@ export default function P2PMarketSellItem({
                     </div>
                     <p className="text-base font-black text-orange-600">₹{parseFloat(price || 0).toLocaleString([], { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <span className="flex items-center gap-1 text-[9px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full text-slate-500">
                       <span className="material-symbols-outlined text-[12px] text-green-600" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
@@ -790,20 +549,32 @@ export default function P2PMarketSellItem({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2 text-center text-xs font-bold">
-                    <div className="h-8 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center">
-                      Message
-                    </div>
-                    <div className="h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center">
-                      Buy Now
-                    </div>
+                    <div className="h-8 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center">Message</div>
+                    <div className="h-8 bg-orange-500 text-white rounded-lg flex items-center justify-center">Buy Now</div>
                   </div>
+                </div>
+              </div>
+
+              {/* AI grading info callout */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                  <span className="text-xs font-black text-blue-800">AI-Powered Inspection</span>
+                </div>
+                <p className="text-[11px] text-blue-700 leading-relaxed">
+                  Our AI analyses <strong>multiple photos</strong> of your item using computer vision (YOLO + Moondream) to detect scratches, dents, cracks and other damage. Buyers see a verified condition grade before messaging you.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Grade A–F', 'Defect Detection', 'Buyer Trust', 'Multi-Angle'].map((tag) => (
+                    <span key={tag} className="text-[9px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{tag}</span>
+                  ))}
                 </div>
               </div>
 
               <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 flex gap-2">
                 <span className="material-symbols-outlined text-orange-600 text-[18px]">lightbulb</span>
                 <p className="text-orange-800 text-[10px] leading-relaxed text-left">
-                  <strong>Pro Tip:</strong> Items with clear, high-resolution photos sell 40% faster on MarketConnect. Add at least 3 photos for better engagement.
+                  <strong>Pro Tip:</strong> Items with clear, high-resolution photos sell 40% faster on MarketConnect. Upload at least 3–6 angles for a more accurate AI grade.
                 </p>
               </div>
             </aside>

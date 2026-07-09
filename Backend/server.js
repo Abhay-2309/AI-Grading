@@ -10,6 +10,7 @@ import gradingRouter from './routes/grading.js';
 import configRouter from './routes/config.js';
 import tryonRouter from './routes/tryon.js';
 import adminRouter from './routes/admin.js';
+import productsRouter from './routes/products.js';
 import { checkBanStatus } from './utils/checkBanStatus.js';
 
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/grading', checkBanStatus, gradingRouter);
 app.use('/api/config', configRouter);
 app.use('/api/tryon', tryonRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/products', productsRouter);
 
 // 404 handler
 app.use((req, res) => {

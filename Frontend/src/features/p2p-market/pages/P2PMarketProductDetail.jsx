@@ -2,6 +2,37 @@ import React, { useState, useMemo, useEffect } from 'react';
 import LocationPill from '../components/LocationPill';
 import { distanceKm, formatDistance } from '../../../services/geo';
 
+// ── AI Grade helpers (MarketConnect-specific — buyer-facing) ─────────────────
+const GRADE_CONFIG = {
+  'A+': { label: 'New (Sealed)',  bg: 'bg-emerald-600', text: 'text-emerald-700', light: 'bg-emerald-50',  border: 'border-emerald-200', icon: 'new_releases' },
+  A:    { label: 'Like New',      bg: 'bg-emerald-500', text: 'text-emerald-700', light: 'bg-emerald-50',  border: 'border-emerald-200', icon: 'verified' },
+  B:    { label: 'Very Good',     bg: 'bg-blue-500',    text: 'text-blue-700',    light: 'bg-blue-50',     border: 'border-blue-200',    icon: 'thumb_up' },
+  C:    { label: 'Good',          bg: 'bg-amber-500',   text: 'text-amber-700',   light: 'bg-amber-50',    border: 'border-amber-200',   icon: 'star_half' },
+  D:    { label: 'Acceptable',    bg: 'bg-orange-500',  text: 'text-orange-700',  light: 'bg-orange-50',   border: 'border-orange-200',  icon: 'warning' },
+  F:    { label: 'Fair/Damaged',  bg: 'bg-red-500',     text: 'text-red-700',     light: 'bg-red-50',      border: 'border-red-200',     icon: 'broken_image' },
+};
+
+function getGradeConfig(grade) {
+  if (!grade) return null;
+  const g = grade.toUpperCase();
+  if (g.startsWith('A+')) return GRADE_CONFIG['A+'];
+  if (g.startsWith('A'))  return GRADE_CONFIG.A;
+  if (g.startsWith('B'))  return GRADE_CONFIG.B;
+  if (g.startsWith('C'))  return GRADE_CONFIG.C;
+  if (g.startsWith('D'))  return GRADE_CONFIG.D;
+  return GRADE_CONFIG.F;
+}
+
+const DEFECT_SEVERITY = {
+  crack: { icon: 'broken_image',       color: 'text-red-600 bg-red-50',     label: 'Crack' },
+  dent:  { icon: 'compress',           color: 'text-orange-600 bg-orange-50', label: 'Dent' },
+  scratch: { icon: 'texture',          color: 'text-amber-600 bg-amber-50',  label: 'Scratch' },
+  stain: { icon: 'water_drop',         color: 'text-blue-600 bg-blue-50',    label: 'Stain' },
+  hole_tear: { icon: 'content_cut',    color: 'text-red-600 bg-red-50',      label: 'Hole/Tear' },
+  pcb_defect: { icon: 'memory',        color: 'text-purple-600 bg-purple-50', label: 'PCB Defect' },
+  structural_damage: { icon: 'warning', color: 'text-red-700 bg-red-50',    label: 'Structural Damage' },
+};
+
 export default function P2PMarketProductDetail({
   p2pProducts,
   productId,
@@ -269,9 +300,21 @@ export default function P2PMarketProductDetail({
           <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200/60 space-y-4">
               <div className="flex justify-between items-center">
-                <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-                  Featured
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">Featured</span>
+                  {product.grade && (
+                    <span className="flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
+                      AI Verified
+                    </span>
+                  )}
+                  {product.aiStatus === 'Pending' && !product.grade && (
+                    <span className="flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-[12px]">pending</span>
+                      AI Inspection Pending
+                    </span>
+                  )}
+                </div>
                 <span className="text-slate-400 text-xs">{product.timeAgo}</span>
               </div>
 
@@ -279,7 +322,7 @@ export default function P2PMarketProductDetail({
                 {product.title}
               </h1>
               <p className="text-slate-400 text-xs font-semibold">{product.location} • {product.category}</p>
-              
+
               <div className="flex items-baseline gap-2 py-1">
                 <span className="text-2xl font-black text-orange-600">₹{product.price.toLocaleString()}</span>
                 {product.originalPrice && (
@@ -287,9 +330,20 @@ export default function P2PMarketProductDetail({
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 text-green-700 text-xs font-bold bg-green-50 w-fit px-2.5 py-1 rounded">
-                <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                <span>Verified Authentic</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-green-700 text-xs font-bold bg-green-50 w-fit px-2.5 py-1 rounded">
+                  <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  <span>Verified Authentic</span>
+                </div>
+                {product.grade && (() => {
+                  const cfg = getGradeConfig(product.grade);
+                  return cfg ? (
+                    <div className={`flex items-center gap-1.5 text-xs font-bold w-fit px-2.5 py-1 rounded ${cfg.light} ${cfg.text}`}>
+                      <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>{cfg.icon}</span>
+                      <span>{cfg.label}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               <div className="pt-4 border-t border-slate-100">
@@ -297,42 +351,105 @@ export default function P2PMarketProductDetail({
                 <p className="text-xs text-slate-600 leading-relaxed">{product.description}</p>
               </div>
 
-              {product.grade && (
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5 text-emerald-700 font-sans">
-                    <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                    AI Grading Report & Assessment
-                  </h3>
-                  <div className="bg-emerald-50/50 rounded-xl p-3.5 border border-emerald-100 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] text-slate-500 font-semibold">Assessed Quality Grade:</span>
-                      <span className="bg-emerald-600 text-white text-xs font-extrabold px-2.5 py-0.5 rounded shadow-sm">
-                        GRADE {product.grade}
-                      </span>
+              {/* ── AI Condition Report — Buyer Facing ──────────────────────── */}
+              {product.grade ? (() => {
+                const cfg = getGradeConfig(product.grade);
+                const defects = product.defects || [];
+                return (
+                  <div className={`pt-4 border-t border-slate-100 space-y-3`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                        AI Condition Report
+                      </h3>
+                      <span className="text-[10px] text-slate-400 font-medium">Powered by YOLO + Moondream</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] text-slate-500 font-semibold">Reported Condition:</span>
-                      <span className="text-xs font-bold text-slate-700">{product.condition}</span>
+
+                    {/* Grade card */}
+                    <div className={`rounded-xl border ${cfg?.border || 'border-slate-200'} ${cfg?.light || 'bg-slate-50'} p-4 space-y-3`}>
+                      {/* Grade badge row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 rounded-xl ${cfg?.bg || 'bg-slate-500'} flex items-center justify-center text-white shadow-md`}>
+                            <span className="text-xl font-black">{product.grade?.toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <p className={`text-sm font-black ${cfg?.text || 'text-slate-700'}`}>{cfg?.label || product.condition}</p>
+                            <p className="text-[10px] text-slate-500">AI-assessed condition grade</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400">Confidence</p>
+                          <p className="text-sm font-black text-slate-700">High</p>
+                        </div>
+                      </div>
+
+                      {/* What was scanned */}
+                      {Object.keys(product.photos || {}).length > 0 && (
+                        <div className="pt-2 border-t border-current/10">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Photos Analysed</p>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1">
+                            {Object.values(product.photos).map((src, idx) => (
+                              <div key={idx} className="w-14 h-14 rounded-lg border border-slate-200 overflow-hidden shrink-0 bg-white">
+                                <img src={src} alt={`angle-${idx}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Defects */}
+                      {defects.length > 0 ? (
+                        <div className="pt-2 border-t border-current/10 space-y-2">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detected Defects</p>
+                          <div className="space-y-1.5">
+                            {defects.map((def, idx) => {
+                              const typeKey = (def.defect_type || def.type || '').toLowerCase();
+                              const sev = DEFECT_SEVERITY[typeKey];
+                              return (
+                                <div key={idx} className="flex items-start gap-2">
+                                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${sev?.color || 'text-slate-600 bg-slate-100'}`}>
+                                    <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                      {sev?.icon || 'error'}
+                                    </span>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-bold text-slate-700">{sev?.label || (def.defect_type || def.type)}</p>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">{def.description || def.desc || 'Detected by AI analysis'}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-current/10 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                          <p className="text-[11px] font-bold text-emerald-700">No physical defects detected by AI analysis.</p>
+                        </div>
+                      )}
                     </div>
-                    {product.defects && product.defects.length > 0 ? (
-                      <div className="pt-2 border-t border-emerald-100 mt-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Detected Defects:</span>
-                        <ul className="list-disc list-inside text-[11px] text-slate-650 space-y-1">
-                          {product.defects.map((def, idx) => (
-                            <li key={idx}>
-                              <span className="font-bold text-slate-700">{def.defect_type || def.type}</span>: {def.description || def.desc}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div className="pt-2 border-t border-emerald-100 mt-2 text-[10px] text-emerald-700 font-medium">
-                        ✓ No structural or visual defects detected by AI analysis.
-                      </div>
-                    )}
+
+                    {/* Trust footer */}
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                      <span className="material-symbols-outlined text-slate-400 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
+                      <p className="text-[10px] text-slate-500 leading-relaxed">
+                        This grade was assigned by our computer vision AI (YOLO + Moondream) and cannot be edited by the seller. It reflects the item's condition at the time of listing.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })() : (product.aiStatus && product.aiStatus !== 'COMPLETED') ? (
+                <div className="pt-4 border-t border-slate-100">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-500 text-[22px] animate-spin">sync</span>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">AI Inspection In Progress</p>
+                      <p className="text-[11px] text-amber-600 mt-0.5">The seller has submitted this listing for AI grading. The condition report will appear here once analysis completes.</p>
+                    </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Seller Info Card */}
               <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-4">
