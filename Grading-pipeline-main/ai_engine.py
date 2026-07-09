@@ -40,27 +40,33 @@ DETECTION_MAP = {
     "Books":       ["book", "novel", "textbook"]
 }
 
+def get_inference_device():
+    # If spaces is loaded and running on Hugging Face ZeroGPU, we use cuda.
+    # Otherwise, detect local GPU/MPS.
+    try:
+        import spaces
+        return "cuda"
+    except ImportError:
+        if torch.backends.mps.is_available():
+            return "mps"
+        elif torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
+
 def initialize_models():
     """
-    Sequentially loads YOLO11 and Moondream2 models into memory,
-    selecting the best hardware accelerator.
+    Sequentially loads YOLO11 and Moondream2 models into memory on CPU
+    to prevent ZeroGPU startup allocation crashes.
     """
     global moondream_model, moondream_tokenizer, yolo_model, device
+    device = "cpu" # Always start on CPU to prevent ZeroGPU startup allocation crash
 
-    # Determine hardware acceleration
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
-
-    print(f"--- INITIALIZING MODELS ON ACCELERATOR: {device} ---")
+    print("--- INITIALIZING MODELS ON CPU ---")
 
     # 1. Load custom YOLO11 Model
     print("Loading YOLO11 structural inspection model...")
     yolo_model = YOLO("runs/detect/returniverse_engine/production_run_v1-4/weights/best.pt")
-    yolo_model.to(device)
+    yolo_model.to("cpu")
     print("YOLO11 structural model successfully loaded.")
 
     # 2. Load Moondream2 with Compatibility Patches
@@ -112,8 +118,8 @@ def initialize_models():
         moondream_model.tokenizer = moondream_tokenizer
         moondream_model.query = types.MethodType(custom_query_impl, moondream_model)
 
-    moondream_model = moondream_model.to(device)
-    print("Moondream2 VLM engine successfully loaded.")
+    moondream_model = moondream_model.to("cpu")
+    print("Moondream2 VLM engine successfully loaded on CPU.")
     print("Sequential model loading completed successfully.")
 
 
@@ -128,8 +134,13 @@ def verify_category_match(image: Image.Image, claimed_category: str) -> dict:
     AI ROLE: Feature Extraction only — asks open-ended "What object is shown?"
     Matching against category aliases is done in pure Python (DETECTION_MAP).
     """
+    global moondream_model
     if moondream_model is None:
         raise RuntimeError("Moondream model is not initialized.")
+
+    # Dynamically move model to active inference device inside the GPU-worker boundary
+    target_device = get_inference_device()
+    moondream_model = moondream_model.to(target_device)
 
     norm_claimed = normalize_category(claimed_category)
 
@@ -139,6 +150,13 @@ def verify_category_match(image: Image.Image, claimed_category: str) -> dict:
     detected_raw = moondream_model.answer_question(
         enc_image, identify_prompt, moondream_tokenizer, max_new_tokens=20
     ).strip().lower()
+
+    # Move back to CPU if we are in ZeroGPU to release resource locks
+    try:
+        import spaces
+        moondream_model = moondream_model.to("cpu")
+    except ImportError:
+        pass
 
     # Keyword matching in Python — NOT in the AI model
     keywords = DETECTION_MAP.get(norm_claimed, [norm_claimed.lower()])
@@ -183,10 +201,17 @@ def extract_structural_features(image: Image.Image) -> Dict[str, Any]:
     and ask Moondream VLM to verify if the defect is actually present.
     If the VLM rejects it, we discard the detection.
     """
+    global yolo_model, moondream_model
     if yolo_model is None:
         raise RuntimeError("YOLO model is not initialized.")
 
-    results = yolo_model(image, device=device)
+    # Dynamically select device and move models inside GPU worker
+    target_device = get_inference_device()
+    yolo_model = yolo_model.to(target_device)
+    if moondream_model is not None:
+        moondream_model = moondream_model.to(target_device)
+
+    results = yolo_model(image, device=target_device)
 
     # Initialize all known classes to zero count
     defect_counts: Dict[str, int] = {
@@ -241,6 +266,15 @@ def extract_structural_features(image: Image.Image) -> Dict[str, Any]:
                 "verified_by_vlm": verified_by_vlm
             })
 
+    # Move models back to CPU to release GPU resource lock
+    try:
+        import spaces
+        yolo_model = yolo_model.to("cpu")
+        if moondream_model is not None:
+            moondream_model = moondream_model.to("cpu")
+    except ImportError:
+        pass
+
     return {
         "defect_counts": defect_counts,   # e.g. {"crack": 1, "dent": 0, ...}
         "raw_detections": raw_detections  # full bounding box data for response
@@ -258,8 +292,13 @@ def extract_semantic_features(image: Image.Image, category: str) -> Dict[str, bo
     AI ROLE: Observation only — returns strict boolean flags.
     NO grades, NO downgrading, NO decisions. All rules live in routing.py.
     """
+    global moondream_model
     if moondream_model is None:
         raise RuntimeError("Moondream model is not initialized.")
+
+    # Dynamically select device and move model inside GPU worker
+    target_device = get_inference_device()
+    moondream_model = moondream_model.to(target_device)
 
     norm_cat = normalize_category(category)
     flags: Dict[str, bool] = {}
@@ -301,5 +340,12 @@ def extract_semantic_features(image: Image.Image, category: str) -> Dict[str, bo
         flags["appears_heavily_damaged"] = ask_yes_no(
             "Does the item appear to be heavily damaged or in poor condition? Answer yes or no."
         )
+
+    # Move model back to CPU to release GPU resource lock
+    try:
+        import spaces
+        moondream_model = moondream_model.to("cpu")
+    except ImportError:
+        pass
 
     return flags
