@@ -68,7 +68,7 @@ function getRequiredFields(category, subcategory, subcategoryTaxonomy) {
 }
 
 const POLL_INTERVAL_MS = 2500;
-const MAX_POLLS = 72; // ~180s ceiling — Gemma fallback can take 47-100s+ per AI1's own docs
+const MAX_POLLS = 100; // ~250s ceiling — covers the rare band-edge re-run (N=1 -> N=3) on CPU-only inference, while staying under AI1's 300s stuck-request sweeper
 
 export default function GuidedPhotoCapture({ activeReturn, returnState, setReturnState, subcategoryTaxonomy, onNext, onBack }) {
   const { fields: requiredViews, labels: viewLabelOverrides } = getRequiredFields(
@@ -229,7 +229,12 @@ export default function GuidedPhotoCapture({ activeReturn, returnState, setRetur
               </span>
               <div>
                 <p className="font-label-bold text-label-bold text-error">
-                  {failureKind === 'service' ? "Couldn't reach the grading service" : "Photos didn't pass the quality check"}
+                  {failureKind === 'service'
+                    ? "Couldn't reach the grading service"
+                    : (failureReason.toLowerCase().includes('mismatch')
+                        ? "Category Mismatch Detected"
+                        : "Photos didn't pass the quality check")
+                  }
                 </p>
                 <p className="text-label-sm text-on-surface-variant mt-1">{failureReason}</p>
                 {failureKind === 'service' && (
