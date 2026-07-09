@@ -1,20 +1,27 @@
 import torch
-from .vision_encoder import VisionEncoder
-from .configuration_moondream import MoondreamConfig
-from transformers import PreTrainedModel
 
-from .modeling_phi import PhiForCausalLM
+from typing import List, Union, Literal, Optional
+from transformers import PreTrainedModel
+from PIL import Image
+
 from .configuration_moondream import PhiConfig
+from .configuration_moondream import MoondreamConfig
+from .vision_encoder import VisionEncoder
+from .region_model import RegionModel
+from .modeling_phi import PhiForCausalLM
 
 class Moondream(PreTrainedModel):
     config_class = MoondreamConfig
     _supports_flash_attn_2 = True
+    # Required by newer transformers versions (>= 4.47) to avoid AttributeError
+    _tied_weights_keys = []
 
     def __init__(self, config):
         super().__init__(config)
         self.vision_encoder = VisionEncoder(
             use_flash_attn=config._attn_implementation == "flash_attention_2"
         )
+        self.region_model = RegionModel()
 
         if type(config.text_config) == dict:
             phi_config = PhiConfig(
@@ -29,7 +36,8 @@ class Moondream(PreTrainedModel):
         return self.text_model.device
 
     def encode_image(self, image):
-        return self.vision_encoder(image)
+        with torch.no_grad():
+            return self.vision_encoder(image)
 
     def input_embeds(self, prompt, image_embeds, tokenizer):
         def _tokenize(txt):
@@ -58,6 +66,9 @@ class Moondream(PreTrainedModel):
 
         return torch.cat(embeds, dim=1)
 
+    def get_input_embeddings(self):
+        return self.text_model.get_input_embeddings()
+
     def generate(
         self,
         image_embeds,
@@ -76,8 +87,11 @@ class Moondream(PreTrainedModel):
 
         with torch.no_grad():
             inputs_embeds = self.input_embeds(prompt, image_embeds, tokenizer)
+            attention_mask = torch.ones((inputs_embeds.shape[0], inputs_embeds.shape[1]), device=self.device)
             output_ids = self.text_model.generate(
-                inputs_embeds=inputs_embeds, **generate_config
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                **generate_config,
             )
 
         return tokenizer.batch_decode(output_ids, skip_special_tokens=True)
@@ -89,7 +103,7 @@ class Moondream(PreTrainedModel):
         tokenizer,
         chat_history="",
         result_queue=None,
-        max_new_tokens=512,
+        max_new_tokens=256,
         **kwargs,
     ):
         prompt = f"<image>\n\n{chat_history}Question: {question}\n\nAnswer:"
@@ -102,7 +116,6 @@ class Moondream(PreTrainedModel):
         )[0]
         cleaned_answer = answer.strip()
 
-        # Use the result_queue to pass the result if it is provided
         if result_queue:
             result_queue.put(cleaned_answer)
         else:
@@ -173,3 +186,6 @@ class Moondream(PreTrainedModel):
             x.strip()
             for x in tokenizer.batch_decode(output_ids, skip_special_tokens=True)
         ]
+
+    def detect(self, image: Image.Image, query: str, tokenizer):
+        pass

@@ -25,10 +25,9 @@ class PhiConfig(PretrainedConfig):
         rope_theta=10000.0,
         rope_scaling=None,
         partial_rotary_factor=0.5,
-        qk_layernorm=False,
         bos_token_id=1,
         eos_token_id=2,
-        pad_token_id=2,  # Always set pad_token_id to prevent AttributeError on newer transformers
+        pad_token_id=2,  # Always set pad_token_id — prevents AttributeError on newer transformers
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -50,10 +49,10 @@ class PhiConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.rope_theta = rope_theta
-        # Normalize rope_scaling: treat "default" rope_type as None (no scaling)
+        # Normalize rope_scaling: newer transformers injects {"rope_type": "default"}
+        # instead of None — treat that as "no scaling" (standard RoPE).
         self.rope_scaling = self._normalize_rope_scaling(rope_scaling)
         self.partial_rotary_factor = partial_rotary_factor
-        self.qk_layernorm = qk_layernorm
 
         super().__init__(
             bos_token_id=bos_token_id,
@@ -65,15 +64,15 @@ class PhiConfig(PretrainedConfig):
 
     @staticmethod
     def _normalize_rope_scaling(rope_scaling):
-        """Convert rope_scaling to None if it represents standard (no-scaling) RoPE.
-        Newer transformers versions inject {"rope_type": "default"} instead of None.
+        """Convert rope_scaling to None if it represents standard RoPE.
+        Newer transformers injects {"rope_type": "default"} instead of None.
         """
         if rope_scaling is None:
             return None
         if isinstance(rope_scaling, dict):
             rope_type = rope_scaling.get("rope_type") or rope_scaling.get("type", "default")
             if rope_type in ("default", "", None):
-                return None  # Treat as standard RoPE — no scaling
+                return None
         return rope_scaling
 
     def _rope_scaling_validation(self):
@@ -84,7 +83,7 @@ class PhiConfig(PretrainedConfig):
             raise ValueError(f"`rope_scaling` must be a dict, got {type(self.rope_scaling)}")
         rope_type = self.rope_scaling.get("type") or self.rope_scaling.get("rope_type", "default")
         if rope_type in ("default", "", None):
-            return  # Valid: will be treated as standard RoPE
+            return
         if rope_type not in ["linear", "dynamic"]:
             raise ValueError(
                 f"`rope_scaling`'s type must be one of ['linear', 'dynamic', 'default'], got {rope_type}"
