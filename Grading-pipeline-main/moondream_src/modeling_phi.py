@@ -319,8 +319,9 @@ class PhiAttention(nn.Module):
                 base=self.rope_theta,
             )
         else:
-            scaling_type = self.config.rope_scaling["type"]
-            scaling_factor = self.config.rope_scaling["factor"]
+            # Newer transformers versions key this "rope_type" instead of "type".
+            scaling_type = self.config.rope_scaling.get("type") or self.config.rope_scaling.get("rope_type", "default")
+            scaling_factor = self.config.rope_scaling.get("factor")
             if scaling_type == "linear":
                 self.rotary_emb = PhiLinearScalingRotaryEmbedding(
                     int(self.partial_rotary_factor * self.head_dim),
@@ -333,6 +334,13 @@ class PhiAttention(nn.Module):
                     int(self.partial_rotary_factor * self.head_dim),
                     max_position_embeddings=self.max_position_embeddings,
                     scaling_factor=scaling_factor,
+                    base=self.rope_theta,
+                )
+            elif scaling_type in (None, "default", ""):
+                # No actual scaling requested — standard RoPE.
+                self.rotary_emb = PhiRotaryEmbedding(
+                    int(self.partial_rotary_factor * self.head_dim),
+                    max_position_embeddings=self.max_position_embeddings,
                     base=self.rope_theta,
                 )
             else:

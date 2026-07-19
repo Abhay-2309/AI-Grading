@@ -8,7 +8,7 @@ import {
 } from '../data/conditionQuestions';
 
 const POLL_INTERVAL_MS = 2500;
-const MAX_POLLS = 72; // ~180s ceiling, matches the grading engine's own worst case
+const MAX_POLLS = 360; // ~900s ceiling — CPU-only inference measured at ~158s/view, serialized per view on the Python engine; matches AI1's 900s stuck-request sweeper
 
 const ANSWER_OPTIONS = [
   { val: 'yes', tone: 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500' },

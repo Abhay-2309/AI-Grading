@@ -5,6 +5,7 @@ import {
   GetCommand,
   UpdateCommand,
   QueryCommand,
+  ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { config } from '../../config/config.js';
 import { StorageError, InvalidStateTransitionError, NotFoundError } from '../../utils/errors.js';
@@ -171,10 +172,9 @@ export class GradingRepository {
     const cutoff = new Date(Date.now() - olderThanMs).toISOString();
     try {
       const res = await doc.send(
-        new QueryCommand({
+        new ScanCommand({
           TableName: TABLE,
-          IndexName: 'GSI2',
-          KeyConditionExpression: '#status = :status AND updatedAt < :cutoff',
+          FilterExpression: '#status = :status AND updatedAt < :cutoff',
           ExpressionAttributeNames: { '#status': 'status' },
           ExpressionAttributeValues: { ':status': 'ANALYZING', ':cutoff': cutoff },
         })

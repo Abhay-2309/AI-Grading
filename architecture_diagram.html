@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Architecture Diagram – Amazon AI Grading Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  body{
+    background:#0D1117;
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 24px;
+  }
+
+  .slide{
+    width:1280px;
+    min-height:720px;
+    background:linear-gradient(145deg,#0D1117 0%,#111827 60%,#0D1117 100%);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:24px;
+    padding:48px 56px 40px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* subtle grid bg */
+  .slide::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(99,102,241,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,0.05) 1px, transparent 1px);
+    background-size:48px 48px;
+    border-radius:24px;
+  }
+
+  /* top glow blobs */
+  .glow-left{
+    position:absolute;top:-160px;left:-120px;
+    width:500px;height:500px;
+    background:radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%);
+    border-radius:50%;pointer-events:none;
+  }
+  .glow-right{
+    position:absolute;top:-120px;right:-100px;
+    width:400px;height:400px;
+    background:radial-gradient(circle,rgba(16,185,129,0.12) 0%,transparent 70%);
+    border-radius:50%;pointer-events:none;
+  }
+
+  /* ── Title ── */
+  .title-block{
+    position:relative;
+    z-index:2;
+    text-align:center;
+    margin-bottom:44px;
+  }
+  .title-label{
+    display:inline-block;
+    background:rgba(99,102,241,0.15);
+    border:1px solid rgba(99,102,241,0.4);
+    color:#818CF8;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    padding:4px 14px;
+    border-radius:100px;
+    margin-bottom:12px;
+  }
+  .title-main{
+    font-size:30px;
+    font-weight:900;
+    color:#F1F5F9;
+    line-height:1.15;
+  }
+  .title-main span{
+    background:linear-gradient(90deg,#818CF8,#34D399);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+
+  /* ── Main layout ── */
+  .arch{
+    position:relative;
+    z-index:2;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  /* Row of boxes */
+  .row{
+    display:flex;
+    align-items:center;
+    gap:0;
+    width:100%;
+  }
+
+  /* ── Box ── */
+  .box{
+    flex:1;
+    border-radius:14px;
+    border:1.5px solid;
+    padding:14px 16px;
+    position:relative;
+    transition:transform .2s;
+  }
+  .box:hover{transform:translateY(-3px);}
+
+  .box-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .box-icon{
+    font-size:22px;
+    width:40px;height:40px;
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .box-name{font-size:13px;font-weight:700;color:#F1F5F9;line-height:1.2;}
+  .box-tech{font-size:10px;font-weight:600;margin-top:2px;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+  .chip{
+    font-size:10px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:6px;
+    white-space:nowrap;
+    border:1px solid;
+  }
+
+  /* ── Arrow ── */
+  .arrow{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:0 6px;
+    flex-shrink:0;
+    gap:4px;
+  }
+  .arrow-line{
+    width:36px;height:2px;
+    background:linear-gradient(90deg,rgba(100,116,139,0.3),rgba(100,116,139,0.7),rgba(100,116,139,0.3));
+    position:relative;
+  }
+  .arrow-line::after{
+    content:'';
+    position:absolute;
+    right:-7px;top:50%;
+    transform:translateY(-50%);
+    border-top:6px solid transparent;
+    border-bottom:6px solid transparent;
+    border-left:8px solid rgba(100,116,139,0.7);
+  }
+  .arrow-label{
+    font-size:8.5px;
+    color:#64748B;
+    font-weight:600;
+    letter-spacing:.03em;
+    white-space:nowrap;
+    text-align:center;
+  }
+
+  /* ── Vertical arrow ── */
+  .v-arrow-row{
+    display:flex;
+    align-items:flex-start;
+    padding:0 0;
+    width:100%;
+  }
+  .v-arrow{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+  }
+  .v-line{
+    width:2px;height:24px;
+    background:linear-gradient(180deg,rgba(100,116,139,0.3),rgba(100,116,139,0.7));
+    position:relative;
+  }
+  .v-line::after{
+    content:'';
+    position:absolute;
+    bottom:-7px;left:50%;
+    transform:translateX(-50%);
+    border-left:6px solid transparent;
+    border-right:6px solid transparent;
+    border-top:8px solid rgba(100,116,139,0.7);
+  }
+  .v-label{font-size:8px;color:#64748B;font-weight:600;margin-top:10px;white-space:nowrap;}
+
+  /* ── Cloud section ── */
+  .cloud-section{
+    border:1.5px dashed rgba(245,158,11,0.4);
+    border-radius:16px;
+    padding:14px 16px 14px;
+    background:rgba(245,158,11,0.03);
+    flex:1;
+  }
+  .cloud-label-top{
+    font-size:9.5px;
+    font-weight:700;
+    color:#F59E0B;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    margin-bottom:10px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .cloud-inner{display:flex;gap:10px;}
+
+  /* ── Outcome row ── */
+  .outcome-section{
+    border-radius:16px;
+    border:1.5px solid rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.02);
+    padding:14px 16px;
+    flex:1;
+  }
+  .outcome-label{
+    font-size:9.5px;
+    font-weight:700;
+    color:#94A3B8;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .outcome-row{display:flex;gap:8px;}
+  .outcome-chip{
+    flex:1;
+    border-radius:10px;
+    border:1.5px solid;
+    padding:10px 10px;
+    text-align:center;
+  }
+  .outcome-icon{font-size:20px;margin-bottom:5px;}
+  .outcome-grade{font-size:13px;font-weight:800;margin-bottom:2px;}
+  .outcome-name{font-size:9px;font-weight:600;color:#94A3B8;}
+
+  /* ── Colour variants ── */
+  /* Frontend – purple */
+  .c-purple{border-color:rgba(139,92,246,0.4);background:rgba(139,92,246,0.07);}
+  .c-purple .box-icon{background:rgba(139,92,246,0.18);}
+  .c-purple .box-tech{color:#A78BFA;}
+  .chip-purple{background:rgba(139,92,246,0.15);color:#A78BFA;border-color:rgba(139,92,246,0.3);}
+
+  /* Backend – blue */
+  .c-blue{border-color:rgba(59,130,246,0.4);background:rgba(59,130,246,0.07);}
+  .c-blue .box-icon{background:rgba(59,130,246,0.18);}
+  .c-blue .box-tech{color:#60A5FA;}
+  .chip-blue{background:rgba(59,130,246,0.15);color:#60A5FA;border-color:rgba(59,130,246,0.3);}
+
+  /* AI Microservice – green */
+  .c-green{border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.07);}
+  .c-green .box-icon{background:rgba(16,185,129,0.18);}
+  .c-green .box-tech{color:#34D399;}
+  .chip-green{background:rgba(16,185,129,0.15);color:#34D399;border-color:rgba(16,185,129,0.3);}
+
+  /* Python – red */
+  .c-red{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.07);}
+  .c-red .box-icon{background:rgba(239,68,68,0.18);}
+  .c-red .box-tech{color:#F87171;}
+  .chip-red{background:rgba(239,68,68,0.15);color:#F87171;border-color:rgba(239,68,68,0.3);}
+
+  /* DB – cyan */
+  .c-cyan{border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.07);}
+  .c-cyan .box-icon{background:rgba(6,182,212,0.18);}
+  .c-cyan .box-tech{color:#22D3EE;}
+  .chip-cyan{background:rgba(6,182,212,0.15);color:#22D3EE;border-color:rgba(6,182,212,0.3);}
+
+  /* small sub-box inside cloud */
+  .sub-box{
+    flex:1;
+    border-radius:10px;
+    border:1px solid rgba(245,158,11,0.25);
+    background:rgba(245,158,11,0.06);
+    padding:10px 12px;
+  }
+  .sub-box-name{font-size:11px;font-weight:700;color:#FCD34D;margin-bottom:4px;}
+  .sub-box-detail{font-size:9.5px;color:#94A3B8;line-height:1.5;}
+
+  /* Outcome colours */
+  .oc-a{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.08);}
+  .oc-a .outcome-grade{color:#34D399;}
+  .oc-b{border-color:rgba(59,130,246,0.5);background:rgba(59,130,246,0.08);}
+  .oc-b .outcome-grade{color:#60A5FA;}
+  .oc-d{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.08);}
+  .oc-d .outcome-grade{color:#FBBF24;}
+  .oc-f{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.07);}
+  .oc-f .outcome-grade{color:#F87171;}
+
+  /* footer */
+  .footer{
+    position:relative;z-index:2;
+    text-align:center;
+    margin-top:28px;
+    font-size:10px;
+    color:#475569;
+    letter-spacing:.04em;
+  }
+
+  /* vertical connector column */
+  .vc{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:0 4px;
+    flex-shrink:0;
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="glow-left"></div>
+  <div class="glow-right"></div>
+
+  <!-- Title -->
+  <div class="title-block">
+    <div class="title-label">🏆 Amazon HackOn 2025</div>
+    <div class="title-main">Amazon Returns &amp; <span>AI Vision Grading Platform</span></div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="arch">
+
+    <!-- ROW 1: Frontend -->
+    <div class="row">
+      <div class="box c-purple" style="max-width:100%">
+        <div class="box-header">
+          <div class="box-icon">🖥️</div>
+          <div>
+            <div class="box-name">Frontend — React 19 + Vite</div>
+            <div class="box-tech">Vercel &nbsp;·&nbsp; Port 5173</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="chip chip-purple">📦 Returns Portal</span>
+          <span class="chip chip-purple">🛍️ MarketConnect P2P</span>
+          <span class="chip chip-purple">✨ Amazon Renewed</span>
+          <span class="chip chip-purple">💚 Cares / NGO</span>
+          <span class="chip chip-purple">⚙️ Admin Dashboard</span>
+          <span class="chip chip-purple">👕 Virtual Try-On</span>
+          <span class="chip chip-purple">📊 Profile &amp; History</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- V-Arrow 1 -->
+    <div style="display:flex;justify-content:center;padding:4px 0 0">
+      <div class="vc">
+        <div class="v-line"></div>
+        <div class="v-label" style="margin-top:10px">HTTPS REST · Multipart Form-Data</div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Backend + DB side by side -->
+    <div class="row" style="gap:12px;align-items:stretch">
+
+      <!-- Backend -->
+      <div class="box c-blue" style="flex:2">
+        <div class="box-header">
+          <div class="box-icon">⚙️</div>
+          <div>
+            <div class="box-name">Backend API — Express.js + Node.js</div>
+            <div class="box-tech">Render.com &nbsp;·&nbsp; Port 5000 &nbsp;·&nbsp; Prisma ORM</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-blue">🔐 Auth &amp; JWT</span>
+          <span class="chip chip-blue">📋 Returns CRUD</span>
+          <span class="chip chip-blue">🤖 Grading Proxy</span>
+          <span class="chip chip-blue">🛒 Marketplace</span>
+          <span class="chip chip-blue">🚫 Fraud Guard</span>
+        </div>
+      </div>
+
+      <!-- H-Arrow to DB -->
+      <div class="arrow" style="margin-top:20px">
+        <div class="arrow-line"></div>
+        <div class="arrow-label">Prisma ORM</div>
+      </div>
+
+      <!-- DB -->
+      <div class="box c-cyan" style="flex:1">
+        <div class="box-header">
+          <div class="box-icon">🗄️</div>
+          <div>
+            <div class="box-name">Supabase PostgreSQL 15</div>
+            <div class="box-tech">Cloud DB &nbsp;·&nbsp; Session Pool</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-cyan">👤 Users</span>
+          <span class="chip chip-cyan">📦 Returns</span>
+          <span class="chip chip-cyan">🛒 Products</span>
+          <span class="chip chip-cyan">💚 Donations</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- V-Arrow 2 -->
+    <div style="display:flex;justify-content:flex-start;padding:4px 0 0;padding-left:calc(25% - 40px)">
+      <div class="vc">
+        <div class="v-line"></div>
+        <div class="v-label" style="margin-top:10px">Server-to-Server Proxy</div>
+      </div>
+    </div>
+
+    <!-- ROW 3: AI Microservice + Cloud side by side -->
+    <div class="row" style="gap:12px;align-items:stretch">
+
+      <!-- AI Microservice -->
+      <div class="box c-green" style="flex:2">
+        <div class="box-header">
+          <div class="box-icon">🚀</div>
+          <div>
+            <div class="box-name">AI Microservice — Fastify + TypeScript</div>
+            <div class="box-tech">Render.com &nbsp;·&nbsp; Port 3000 &nbsp;·&nbsp; Async Grading Pipeline</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-green">📥 Intake &amp; Quality Check</span>
+          <span class="chip chip-green">🔄 3-Run Voting Pipeline</span>
+          <span class="chip chip-green">⚡ Circuit Breaker</span>
+          <span class="chip chip-green">🧹 Stuck-Request Sweeper</span>
+          <span class="chip chip-green">🔑 Idempotency Guard</span>
+        </div>
+      </div>
+
+      <!-- H-Arrow to Cloud -->
+      <div class="arrow" style="margin-top:20px">
+        <div class="arrow-line"></div>
+        <div class="arrow-label">S3 Upload<br/>DynamoDB</div>
+      </div>
+
+      <!-- AWS Cloud block -->
+      <div class="cloud-section" style="flex:1">
+        <div class="cloud-label-top">☁️ AWS Cloud — ap-south-1</div>
+        <div class="cloud-inner">
+          <div class="sub-box">
+            <div class="sub-box-name">🪣 S3</div>
+            <div class="sub-box-detail">Photo storage<br/>Original · Analysis · Thumb</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-name">⚡ DynamoDB</div>
+            <div class="sub-box-detail">State machine<br/>UPLOADED→COMPLETED</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V-Arrow 3 -->
+    <div style="display:flex;justify-content:flex-start;padding:4px 0 0;padding-left:calc(25% - 40px)">
+      <div class="vc">
+        <div class="v-line"></div>
+        <div class="v-label" style="margin-top:10px">POST Multipart — Per View Image</div>
+      </div>
+    </div>
+
+    <!-- ROW 4: Python AI Engine + Outcomes side by side -->
+    <div class="row" style="gap:12px;align-items:stretch">
+
+      <!-- Python Engine -->
+      <div class="box c-red" style="flex:2">
+        <div class="box-header">
+          <div class="box-icon">🧠</div>
+          <div>
+            <div class="box-name">Python AI Engine — FastAPI + Uvicorn</div>
+            <div class="box-tech">Local / HuggingFace Spaces &nbsp;·&nbsp; Port 8000 &nbsp;·&nbsp; CPU Inference</div>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-red">👁️ YOLO11 — Defect Detection</span>
+          <span class="chip chip-red">🔍 Moondream2 VLM — Audit &amp; Verify</span>
+          <span class="chip chip-red">🗺️ Category Routing</span>
+          <span class="chip chip-red">🛡️ Fraud Detection</span>
+        </div>
+      </div>
+
+      <!-- H-Arrow to Outcomes -->
+      <div class="arrow" style="margin-top:20px">
+        <div class="arrow-line"></div>
+        <div class="arrow-label">Grade<br/>A+ → F</div>
+      </div>
+
+      <!-- Routing Outcomes -->
+      <div class="outcome-section" style="flex:1">
+        <div class="outcome-label">📊 Routing Outcomes</div>
+        <div class="outcome-row">
+          <div class="outcome-chip oc-a">
+            <div class="outcome-icon">✅</div>
+            <div class="outcome-grade">A+/A</div>
+            <div class="outcome-name">Restock</div>
+          </div>
+          <div class="outcome-chip oc-b">
+            <div class="outcome-icon">🔧</div>
+            <div class="outcome-grade">B/C</div>
+            <div class="outcome-name">Refurbish</div>
+          </div>
+          <div class="outcome-chip oc-d">
+            <div class="outcome-icon">🛒</div>
+            <div class="outcome-grade">D</div>
+            <div class="outcome-name">P2P Resale</div>
+          </div>
+          <div class="outcome-chip oc-f">
+            <div class="outcome-icon">💚</div>
+            <div class="outcome-grade">F</div>
+            <div class="outcome-name">NGO Donate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /arch -->
+
+  <div class="footer">
+    React 19 &nbsp;·&nbsp; Express.js &nbsp;·&nbsp; Fastify (TypeScript) &nbsp;·&nbsp; FastAPI &nbsp;·&nbsp; YOLO11 &nbsp;·&nbsp; Moondream2 VLM &nbsp;·&nbsp; AWS S3 + DynamoDB &nbsp;·&nbsp; Supabase PostgreSQL
+  </div>
+</div>
+</body>
+</html>

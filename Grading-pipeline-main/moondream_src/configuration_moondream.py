@@ -64,6 +64,10 @@ class PhiConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+        # PretrainedConfig.__init__ (newer transformers) re-derives rope_scaling
+        # from rope_theta/partial_rotary_factor as {"rope_type": "default", ...},
+        # clobbering the normalization above — re-apply it post-super().__init__().
+        self.rope_scaling = self._normalize_rope_scaling(self.rope_scaling)
 
     @staticmethod
     def _normalize_rope_scaling(rope_scaling):

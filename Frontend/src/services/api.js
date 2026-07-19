@@ -122,6 +122,25 @@ export function useGlobalState() {
       });
   }, []);
 
+  // Re-fetches a single product and merges it into local state. Needed
+  // because AI grading (grading.js's /p2p/:id/submit + /result) updates the
+  // product's image/photos/thumbnails/grade/aiStatus entirely server-side —
+  // the local p2pProducts array only ever gets the pre-photo placeholder
+  // from addP2PProduct's creation response, so callers must refresh once
+  // grading finishes or the UI keeps showing the empty-image, "Pending" copy.
+  const refreshP2PProduct = useCallback((productId) => {
+    return apiFetch(`/api/p2p/products/${productId}`)
+      .then((updated) => {
+        setP2pProducts((prev) =>
+          prev.some((p) => p.id === productId)
+            ? prev.map((p) => (p.id === productId ? updated : p))
+            : [updated, ...prev]
+        );
+        return updated;
+      })
+      .catch((err) => console.error('Failed to refresh p2p product:', err));
+  }, []);
+
   // Async — returns a Promise<string> (the phone number). Throws on
   // insufficient green credits so the caller can show a real error.
   const revealSellerPhone = useCallback((productId) => {
@@ -253,6 +272,7 @@ export function useGlobalState() {
     p2pProducts,
     p2pChats,
     addP2PProduct,
+    refreshP2PProduct,
     revealSellerPhone,
     sendP2PMessage,
     startP2PChat,

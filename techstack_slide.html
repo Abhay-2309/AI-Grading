@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Tech Stack – Amazon AI Grading Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  body{
+    background:#0D1117;
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 24px;
+  }
+
+  .slide{
+    width:1280px;
+    background:linear-gradient(145deg,#0D1117 0%,#111827 60%,#0D1117 100%);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:24px;
+    padding:44px 56px 36px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .slide::before{
+    content:'';
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(99,102,241,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(99,102,241,0.04) 1px,transparent 1px);
+    background-size:48px 48px;
+    border-radius:24px;
+    pointer-events:none;
+  }
+  .glow-tl{position:absolute;top:-180px;left:-140px;width:520px;height:520px;background:radial-gradient(circle,rgba(99,102,241,0.13) 0%,transparent 70%);border-radius:50%;pointer-events:none;}
+  .glow-br{position:absolute;bottom:-160px;right:-120px;width:480px;height:480px;background:radial-gradient(circle,rgba(16,185,129,0.1) 0%,transparent 70%);border-radius:50%;pointer-events:none;}
+
+  /* Title */
+  .title-block{position:relative;z-index:2;text-align:center;margin-bottom:36px;}
+  .title-label{
+    display:inline-block;
+    background:rgba(99,102,241,0.15);
+    border:1px solid rgba(99,102,241,0.4);
+    color:#818CF8;
+    font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    padding:4px 14px;border-radius:100px;margin-bottom:12px;
+  }
+  .title-main{font-size:28px;font-weight:900;color:#F1F5F9;line-height:1.15;}
+  .title-main span{
+    background:linear-gradient(90deg,#818CF8,#34D399);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .title-sub{font-size:13px;color:#64748B;margin-top:6px;}
+
+  /* Grid */
+  .grid{
+    position:relative;z-index:2;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+  }
+
+  /* Category card */
+  .card{
+    border-radius:16px;
+    border:1.5px solid;
+    padding:0;
+    overflow:hidden;
+    transition:transform .2s,box-shadow .2s;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4);}
+
+  .card-header{
+    padding:12px 16px 10px;
+    display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .card-icon{font-size:20px;width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .card-title{font-size:12px;font-weight:800;letter-spacing:.02em;}
+  .card-sub{font-size:10px;margin-top:1px;opacity:.7;}
+
+  .card-body{padding:10px 14px 14px;}
+
+  /* Table inside card */
+  table{width:100%;border-collapse:collapse;}
+  tr{border-bottom:1px solid rgba(255,255,255,0.04);}
+  tr:last-child{border-bottom:none;}
+  td{padding:7px 0;vertical-align:middle;}
+  .td-tech{
+    display:flex;align-items:center;gap:8px;
+  }
+  .tech-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .tech-name{font-size:11.5px;font-weight:600;color:#E2E8F0;}
+  .tech-desc{font-size:10px;color:#64748B;text-align:right;padding-left:8px;}
+  .badge{
+    display:inline-block;
+    font-size:9px;font-weight:700;
+    padding:1px 7px;border-radius:5px;
+    white-space:nowrap;
+    margin-left:6px;
+  }
+
+  /* Colour themes */
+  /* Purple – Frontend */
+  .cat-purple{border-color:rgba(139,92,246,0.4);background:rgba(139,92,246,0.06);}
+  .cat-purple .card-header{background:rgba(139,92,246,0.1);}
+  .cat-purple .card-icon{background:rgba(139,92,246,0.2);}
+  .cat-purple .card-title{color:#A78BFA;}
+  .cat-purple .tech-dot{background:#A78BFA;}
+  .badge-purple{background:rgba(139,92,246,0.2);color:#A78BFA;}
+
+  /* Blue – Backend */
+  .cat-blue{border-color:rgba(59,130,246,0.4);background:rgba(59,130,246,0.05);}
+  .cat-blue .card-header{background:rgba(59,130,246,0.1);}
+  .cat-blue .card-icon{background:rgba(59,130,246,0.2);}
+  .cat-blue .card-title{color:#60A5FA;}
+  .cat-blue .tech-dot{background:#60A5FA;}
+  .badge-blue{background:rgba(59,130,246,0.2);color:#60A5FA;}
+
+  /* Green – AI Microservice */
+  .cat-green{border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.05);}
+  .cat-green .card-header{background:rgba(16,185,129,0.1);}
+  .cat-green .card-icon{background:rgba(16,185,129,0.2);}
+  .cat-green .card-title{color:#34D399;}
+  .cat-green .tech-dot{background:#34D399;}
+  .badge-green{background:rgba(16,185,129,0.2);color:#34D399;}
+
+  /* Red – AI Engine */
+  .cat-red{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.05);}
+  .cat-red .card-header{background:rgba(239,68,68,0.1);}
+  .cat-red .card-icon{background:rgba(239,68,68,0.2);}
+  .cat-red .card-title{color:#F87171;}
+  .cat-red .tech-dot{background:#F87171;}
+  .badge-red{background:rgba(239,68,68,0.2);color:#F87171;}
+
+  /* Orange – Cloud */
+  .cat-orange{border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.04);}
+  .cat-orange .card-header{background:rgba(245,158,11,0.1);}
+  .cat-orange .card-icon{background:rgba(245,158,11,0.2);}
+  .cat-orange .card-title{color:#FBBF24;}
+  .cat-orange .tech-dot{background:#FBBF24;}
+  .badge-orange{background:rgba(245,158,11,0.2);color:#FBBF24;}
+
+  /* Cyan – Database */
+  .cat-cyan{border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.05);}
+  .cat-cyan .card-header{background:rgba(6,182,212,0.1);}
+  .cat-cyan .card-icon{background:rgba(6,182,212,0.2);}
+  .cat-cyan .card-title{color:#22D3EE;}
+  .cat-cyan .tech-dot{background:#22D3EE;}
+  .badge-cyan{background:rgba(6,182,212,0.2);color:#22D3EE;}
+
+  /* Footer */
+  .footer{
+    position:relative;z-index:2;
+    text-align:center;margin-top:24px;
+    font-size:10px;color:#374151;letter-spacing:.04em;
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="glow-tl"></div>
+  <div class="glow-br"></div>
+
+  <!-- Title -->
+  <div class="title-block">
+    <div class="title-label">🛠️ Technology Stack</div>
+    <div class="title-main">Built With <span>Enterprise-Grade Technologies</span></div>
+    <div class="title-sub">4 microservices · 2 AI models · 3 cloud datastores · 7 portals</div>
+  </div>
+
+  <!-- 3×2 Grid -->
+  <div class="grid">
+
+    <!-- 1. Frontend -->
+    <div class="card cat-purple">
+      <div class="card-header">
+        <div class="card-icon">🖥️</div>
+        <div>
+          <div class="card-title">Frontend</div>
+          <div class="card-sub">SPA · Vercel · Port 5173</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">React 19</span><span class="badge badge-purple">v19.2</span></div></td>
+            <td class="tech-desc">UI Framework</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Vite 8</span><span class="badge badge-purple">v8.1</span></div></td>
+            <td class="tech-desc">Build Tool &amp; Dev Server</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Tailwind CSS 4</span></div></td>
+            <td class="tech-desc">Utility-first Styling</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">React Router v7</span></div></td>
+            <td class="tech-desc">Client-side Routing</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Lucide Icons</span></div></td>
+            <td class="tech-desc">Icon Library</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. Backend API -->
+    <div class="card cat-blue">
+      <div class="card-header">
+        <div class="card-icon">⚙️</div>
+        <div>
+          <div class="card-title">Backend API</div>
+          <div class="card-sub">Express.js · Render.com · Port 5000</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Node.js 20+</span></div></td>
+            <td class="tech-desc">JavaScript Runtime</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Express.js 4</span><span class="badge badge-blue">v4.19</span></div></td>
+            <td class="tech-desc">REST API Framework</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Prisma ORM</span><span class="badge badge-blue">v6.x</span></div></td>
+            <td class="tech-desc">Database ORM + Migrations</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">bcrypt + JWT</span></div></td>
+            <td class="tech-desc">Auth &amp; Sessions</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Multer</span></div></td>
+            <td class="tech-desc">Multipart File Handling</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3. AI Microservice -->
+    <div class="card cat-green">
+      <div class="card-header">
+        <div class="card-icon">🚀</div>
+        <div>
+          <div class="card-title">AI Microservice</div>
+          <div class="card-sub">Fastify · Render.com · Port 3000</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Fastify 5</span><span class="badge badge-green">TypeScript</span></div></td>
+            <td class="tech-desc">High-perf REST API</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">AWS SDK v3</span></div></td>
+            <td class="tech-desc">S3 + DynamoDB Client</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Sharp</span></div></td>
+            <td class="tech-desc">Image Resize + Convert</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Zod</span></div></td>
+            <td class="tech-desc">Schema Validation</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Pino Logger</span></div></td>
+            <td class="tech-desc">Structured JSON Logging</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 4. Python AI Engine -->
+    <div class="card cat-red">
+      <div class="card-header">
+        <div class="card-icon">🧠</div>
+        <div>
+          <div class="card-title">Python AI Engine</div>
+          <div class="card-sub">FastAPI · Uvicorn · Port 8000</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">YOLO11</span><span class="badge badge-red">Ultralytics</span></div></td>
+            <td class="tech-desc">Defect Detection</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Moondream2 VLM</span></div></td>
+            <td class="tech-desc">Visual Audit + Category Verify</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">FastAPI</span></div></td>
+            <td class="tech-desc">Async REST API</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">PyTorch</span></div></td>
+            <td class="tech-desc">ML Inference Backend</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Pillow / OpenCV</span></div></td>
+            <td class="tech-desc">Image Pre-processing</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 5. Cloud Infrastructure -->
+    <div class="card cat-orange">
+      <div class="card-header">
+        <div class="card-icon">☁️</div>
+        <div>
+          <div class="card-title">Cloud Infrastructure</div>
+          <div class="card-sub">AWS · ap-south-1</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">AWS S3</span><span class="badge badge-orange">Storage</span></div></td>
+            <td class="tech-desc">Photo Archival (3 variants)</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">AWS DynamoDB</span><span class="badge badge-orange">NoSQL</span></div></td>
+            <td class="tech-desc">Grading State Machine</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">IAM Policies</span></div></td>
+            <td class="tech-desc">Least-privilege Access</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Presigned URLs</span></div></td>
+            <td class="tech-desc">Secure Direct Image Access</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">GSI Indexes</span></div></td>
+            <td class="tech-desc">Efficient Status Queries</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. Database & DevOps -->
+    <div class="card cat-cyan">
+      <div class="card-header">
+        <div class="card-icon">🗄️</div>
+        <div>
+          <div class="card-title">Database &amp; DevOps</div>
+          <div class="card-sub">Supabase · Vercel · Render</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <table>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">PostgreSQL 15</span><span class="badge badge-cyan">Supabase</span></div></td>
+            <td class="tech-desc">Primary Relational DB</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Vercel</span></div></td>
+            <td class="tech-desc">Frontend Deployment (CDN)</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Render.com</span></div></td>
+            <td class="tech-desc">Backend &amp; AI Microservice</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Git + GitHub</span></div></td>
+            <td class="tech-desc">Version Control &amp; CI/CD</td>
+          </tr>
+          <tr>
+            <td><div class="td-tech"><div class="tech-dot"></div><span class="tech-name">Nodemon / tsx watch</span></div></td>
+            <td class="tech-desc">Hot-reload Dev Servers</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <div class="footer">
+    Amazon Returns &amp; AI Vision Grading Platform &nbsp;·&nbsp; Amazon HackOn 2025
+  </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,18 @@
 import { config } from '../../../config/config.js';
 import { ModelUnavailableError } from '../../../utils/errors.js';
 import type { SingleViewDetectionInput, RawModelResponse, VisionGrader } from './types.js';
+import { Agent, fetch as undiciFetch, FormData as UndiciFormData } from 'undici';
+
+// Must stay >= config.MODEL_TIMEOUT_MS — undici's own bodyTimeout/headersTimeout
+// abort the request independently of (and before) the AbortSignal.timeout()
+// below if set lower, silently undercutting whatever MODEL_TIMEOUT_MS is
+// configured to allow.
+const customDispatcher = new Agent({
+  bodyTimeout: config.MODEL_TIMEOUT_MS,
+  headersTimeout: config.MODEL_TIMEOUT_MS,
+  keepAliveTimeout: 300000
+});
+
 
 /**
  * Adapter function that maps the custom Python FastAPI response schema (V2)
@@ -105,12 +117,13 @@ export class PythonGrader implements VisionGrader {
       };
 
       try {
-        const response = await fetch(url, {
+        const response = await undiciFetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload),
+          dispatcher: customDispatcher,
           signal: AbortSignal.timeout(config.MODEL_TIMEOUT_MS)
         });
 
@@ -137,7 +150,7 @@ export class PythonGrader implements VisionGrader {
     } else {
       // Fallback to standard FastAPI multipart endpoint for local execution
       const url = `${cleanEngineUrl}/api/v1/evaluate/disposition`;
-      const formData = new FormData();
+      const formData = new UndiciFormData();
       formData.append('source', 'sell');
       formData.append('claimed_category', input.category);
       formData.append('gatekeeper_answers', JSON.stringify({})); // Empty survey fallback
@@ -149,9 +162,10 @@ export class PythonGrader implements VisionGrader {
       );
 
       try {
-        const response = await fetch(url, {
+        const response = await undiciFetch(url, {
           method: 'POST',
           body: formData,
+          dispatcher: customDispatcher,
           signal: AbortSignal.timeout(config.MODEL_TIMEOUT_MS)
         });
 

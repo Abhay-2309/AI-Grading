@@ -7,6 +7,7 @@ const LISTING_FEE_CREDITS = 20;
 
 export default function P2PMarketSellItem({
   onAddProduct,
+  onProductGraded,
   userLocation,
   onDetectLocation,
   greenCredits,
@@ -91,6 +92,17 @@ export default function P2PMarketSellItem({
         setPublishing(false);
       }, 2000);
     }
+  };
+
+  // Step 2 → Step 3: grading.js's /p2p/:id/submit + /result already wrote the
+  // real image/photos/thumbnails/grade/aiStatus onto the product server-side
+  // (see SellerAiInspection) — pull that down into local state now, since
+  // nothing else re-fetches this product before it's shown elsewhere.
+  const handleInspectionComplete = async () => {
+    if (createdProduct?.id) {
+      await onProductGraded?.(createdProduct.id);
+    }
+    setStep(3);
   };
 
   const handleBackStep = () => {
@@ -402,7 +414,7 @@ export default function P2PMarketSellItem({
                   productId={createdProduct?.id}
                   category={category}
                   subcategoryTaxonomy={subcategoryTaxonomy}
-                  onNext={() => setStep(3)}
+                  onNext={handleInspectionComplete}
                   onBack={() => setStep(1)}
                 />
               )}

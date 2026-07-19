@@ -8,9 +8,27 @@ import { gradingRepository } from '../db/repository.js';
  * marks anything stuck past the threshold as FAILED.
  */
 export async function sweepStuckRequests(): Promise<number> {
-  const stuck = await gradingRepository.findStuckAnalyzing(config.SWEEPER_STUCK_THRESHOLD_MS);
-  let swept = 0;
+  let stuck;
+  try {
+    stuck = await gradingRepository.findStuckAnalyzing(config.SWEEPER_STUCK_THRESHOLD_MS);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errDetails = String((err as any)?.details?.cause || '');
+    const isAccessDenied = 
+      errMsg.includes('AccessDenied') || 
+      errMsg.includes('not authorized') ||
+      errDetails.includes('AccessDenied') ||
+      errDetails.includes('not authorized');
 
+    if (isAccessDenied) {
+      logger.warn('Stuck-request sweeper lacks DynamoDB Scan/Query permissions; disabling background sweeper.');
+      stopSweeper();
+      return 0;
+    }
+    throw err;
+  }
+
+  let swept = 0;
   for (const record of stuck) {
     try {
       await gradingRepository.transitionStatus(record.requestId, 'ANALYZING', 'FAILED', {

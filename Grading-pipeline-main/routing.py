@@ -17,7 +17,29 @@ MOCK_ORDER_DATABASE = {
 CATEGORY_ALIASES = {
     "clothes": "Apparel", "clothing": "Apparel", "fashion": "Apparel",
     "shoes": "Footwear", "sneaker": "Footwear", "mobile": "Smartphone", "phone": "Smartphone",
-    "appliances": "HomeGoods", "home goods": "HomeGoods"
+    "appliances": "HomeGoods", "home goods": "HomeGoods",
+
+    # AI1 / MarketConnect P2P category identifiers (flat + subcategory), see
+    # AI1/src/config/required-views.ts CATEGORIES and Backend/config/subcategoryTaxonomy.js.
+    # Without these, normalize_category() falls through to raw.title(), producing
+    # keys like "Apparel_Shirt" that don't exist in DETECTION_MAP/QUESTION_BANK,
+    # so every P2P listing failed category verification regardless of the photo.
+    "electronics": "Electronics",
+    "apparel": "Apparel",
+    "books": "Books",
+    "home": "HomeGoods",
+    "toys": "Toys",
+    "sports": "Sports",
+    "other": "Other",
+    "electronics_mobile": "Smartphone",
+    "electronics_laptop": "Laptop",
+    "electronics_camera": "Electronics",
+    "apparel_shirt": "Apparel",
+    "apparel_saree": "Apparel",
+    "apparel_footwear": "Footwear",
+    "accessories_watch": "Electronics",
+    "accessories_bag": "Accessories",
+    "home_appliance": "HomeGoods",
 }
 
 MARKET_DATABASE = {

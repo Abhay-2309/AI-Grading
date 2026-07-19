@@ -9,6 +9,10 @@ async function start(): Promise<void> {
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     logger.info(`Server listening on port ${config.PORT}`);
+    logger.info(
+      { modelTimeoutMs: config.MODEL_TIMEOUT_MS, sweeperStuckThresholdMs: config.SWEEPER_STUCK_THRESHOLD_MS },
+      'effective AI timeout config'
+    );
     startSweeper();
   } catch (err) {
     logger.error(err, 'Failed to start server');

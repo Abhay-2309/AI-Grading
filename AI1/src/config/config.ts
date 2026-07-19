@@ -28,13 +28,20 @@ const envSchema = z.object({
   PYTHON_AI_ENGINE_URL: z.string().default('http://127.0.0.1:8000'),
   GEMMA_API_KEY: z.string().min(1),
   GEMMA_MODEL: z.string().default('gemma-3-27b-it'),
-  MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(100000),
+  // CPU-only local inference (Moondream2 + YOLO, no GPU) measures ~158s for a
+  // single view alone; views for a request run concurrently on AI1's side but
+  // serialize on the Python engine's single blocking event loop, so the last
+  // view of a multi-view category can wait ~(numViews x per-view time).
+  // Sized to comfortably cover a 2-view category (apparel/books) end-to-end.
+  MODEL_TIMEOUT_MS: z.coerce.number().int().positive().default(400000),
 
   CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
   CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(120000),
 
   SWEEPER_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
-  SWEEPER_STUCK_THRESHOLD_MS: z.coerce.number().int().positive().default(300000),
+  // Must exceed MODEL_TIMEOUT_MS x (1 internal retry + margin) or the sweeper
+  // kills requests that are still legitimately processing on slow CPU inference.
+  SWEEPER_STUCK_THRESHOLD_MS: z.coerce.number().int().positive().default(900000),
 });
 
 export type Config = z.infer<typeof envSchema>;

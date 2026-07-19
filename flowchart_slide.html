@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Flow Diagram – Amazon AI Grading Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:#0D1117;
+    font-family:'Inter',sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;padding:32px 24px;
+  }
+
+  .slide{
+    width:1280px;
+    background:linear-gradient(145deg,#0D1117 0%,#111827 55%,#0D1117 100%);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:24px;
+    padding:44px 48px 36px;
+    position:relative;overflow:hidden;
+  }
+  .slide::before{
+    content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(99,102,241,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.04) 1px,transparent 1px);
+    background-size:48px 48px;border-radius:24px;pointer-events:none;
+  }
+  .glow1{position:absolute;top:-180px;left:-140px;width:500px;height:500px;background:radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%);border-radius:50%;pointer-events:none;}
+  .glow2{position:absolute;bottom:-160px;right:-120px;width:480px;height:480px;background:radial-gradient(circle,rgba(16,185,129,0.1) 0%,transparent 70%);border-radius:50%;pointer-events:none;}
+
+  /* Title */
+  .title-block{position:relative;z-index:2;text-align:center;margin-bottom:36px;}
+  .title-label{
+    display:inline-block;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);
+    color:#818CF8;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    padding:4px 14px;border-radius:100px;margin-bottom:12px;
+  }
+  .title-main{font-size:28px;font-weight:900;color:#F1F5F9;line-height:1.15;}
+  .title-main span{background:linear-gradient(90deg,#818CF8,#34D399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .title-sub{font-size:13px;color:#64748B;margin-top:6px;}
+
+  /* ── Main flow area ── */
+  .flow{position:relative;z-index:2;}
+
+  /* ── Top row: linear steps 1–5 ── */
+  .top-row{
+    display:flex;align-items:center;justify-content:center;gap:0;
+    margin-bottom:0;
+  }
+
+  /* Step box */
+  .step{
+    display:flex;flex-direction:column;align-items:center;
+    width:172px;flex-shrink:0;
+  }
+  .step-bubble{
+    width:68px;height:68px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;
+    border:2.5px solid;
+    flex-shrink:0;
+    position:relative;
+    transition:transform .2s;
+  }
+  .step-bubble:hover{transform:scale(1.08);}
+  .step-num{
+    position:absolute;top:-6px;right:-6px;
+    width:20px;height:20px;border-radius:50%;
+    font-size:9px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid #0D1117;
+  }
+  .step-name{font-size:12px;font-weight:700;color:#E2E8F0;margin-top:10px;text-align:center;line-height:1.3;}
+  .step-detail{font-size:9.5px;color:#64748B;text-align:center;margin-top:4px;line-height:1.4;max-width:155px;}
+
+  /* Arrow between steps */
+  .h-arrow{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    flex-shrink:0;padding:0 2px;margin-bottom:36px;
+  }
+  .h-line{width:28px;height:2.5px;background:linear-gradient(90deg,rgba(100,116,139,0.4),rgba(100,116,139,0.8));position:relative;}
+  .h-line::after{content:'';position:absolute;right:-7px;top:50%;transform:translateY(-50%);border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid rgba(100,116,139,0.8);}
+  .h-alabel{font-size:8px;color:#475569;font-weight:600;white-space:nowrap;}
+
+  /* ── Decision diamond ── */
+  .decision-row{
+    display:flex;align-items:flex-start;justify-content:center;gap:0;
+    margin-top:24px;
+  }
+
+  .diamond-wrap{
+    display:flex;flex-direction:column;align-items:center;
+    flex-shrink:0;
+  }
+  /* down arrow from step 3 */
+  .v-down{display:flex;flex-direction:column;align-items:center;gap:0;}
+  .v-line-d{width:2.5px;height:28px;background:linear-gradient(180deg,rgba(100,116,139,0.4),rgba(100,116,139,0.8));position:relative;}
+  .v-line-d::after{content:'';position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(100,116,139,0.8);}
+
+  .diamond{
+    width:120px;height:60px;
+    background:rgba(245,158,11,0.1);
+    border:2.5px solid rgba(245,158,11,0.6);
+    border-radius:8px;
+    transform:rotate(0deg);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+    clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+    margin:4px 0;
+  }
+  .diamond-inner{
+    transform:rotate(0deg);
+    font-size:11px;font-weight:800;color:#FCD34D;
+    text-align:center;line-height:1.2;
+    /* override clip */
+    display:flex;align-items:center;justify-content:center;
+    width:100%;height:100%;
+  }
+  /* using a rotated square as diamond */
+  .dia{
+    width:86px;height:86px;
+    background:rgba(245,158,11,0.08);
+    border:2.5px solid rgba(245,158,11,0.55);
+    border-radius:6px;
+    transform:rotate(45deg);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    transition:transform .2s,box-shadow .2s;
+  }
+  .dia:hover{transform:rotate(45deg) scale(1.07);box-shadow:0 0 24px rgba(245,158,11,0.25);}
+  .dia-text{transform:rotate(-45deg);font-size:10px;font-weight:800;color:#FCD34D;text-align:center;line-height:1.3;width:70px;}
+
+  /* branches */
+  .branches{
+    display:flex;align-items:flex-start;gap:0;
+    margin-top:0;
+  }
+  .branch-fail{
+    display:flex;flex-direction:column;align-items:center;
+    margin-right:0;
+  }
+  .branch-pass{
+    display:flex;flex-direction:column;align-items:center;
+  }
+
+  /* branch label on side arrow */
+  .side-arrow{display:flex;align-items:center;gap:4px;}
+  .side-line{height:2.5px;background:linear-gradient(90deg,rgba(100,116,139,0.6),rgba(100,116,139,0.3));}
+  .side-label{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap;}
+
+  /* outcome boxes at the bottom */
+  .outcome-grid{
+    display:flex;gap:12px;
+    margin-top:28px;justify-content:center;
+  }
+  .outcome-box{
+    border-radius:14px;border:2px solid;
+    padding:14px 16px;text-align:center;
+    min-width:130px;flex:1;
+    transition:transform .2s;
+  }
+  .outcome-box:hover{transform:translateY(-4px);}
+  .ob-icon{font-size:26px;margin-bottom:6px;}
+  .ob-grade{font-size:18px;font-weight:900;margin-bottom:3px;}
+  .ob-label{font-size:11px;font-weight:700;margin-bottom:3px;}
+  .ob-desc{font-size:9.5px;color:#64748B;line-height:1.4;}
+
+  /* ── Middle connector: step 3 branches ── */
+  .mid-section{
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    gap:0;
+    position:relative;
+    margin-top:28px;
+  }
+
+  /* Vertical line from step 3 (Quality Check) going down */
+  .center-col{display:flex;flex-direction:column;align-items:center;}
+
+  /* FAIL branch goes left */
+  .fail-branch{
+    display:flex;align-items:flex-start;
+    flex-direction:column;
+    align-items:center;
+  }
+  .fail-box{
+    background:rgba(239,68,68,0.08);border:1.5px solid rgba(239,68,68,0.4);
+    border-radius:12px;padding:10px 14px;text-align:center;min-width:150px;
+    margin-top:12px;
+  }
+  .fail-box-icon{font-size:20px;margin-bottom:4px;}
+  .fail-box-title{font-size:11px;font-weight:700;color:#F87171;margin-bottom:3px;}
+  .fail-box-desc{font-size:9px;color:#64748B;line-height:1.4;}
+
+  /* Horizontal connector left */
+  .h-branch-left{display:flex;align-items:center;}
+  .h-b-line{height:2.5px;background:linear-gradient(90deg,rgba(239,68,68,0.6),rgba(239,68,68,0.2));}
+  .h-b-arrow-left{width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid rgba(239,68,68,0.6);}
+  .h-b-label{font-size:9px;font-weight:700;color:#F87171;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:2px 7px;border-radius:5px;white-space:nowrap;}
+
+  /* colours */
+  .c1{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.08);}
+  .c1 .step-bubble{border-color:rgba(139,92,246,0.6);background:rgba(139,92,246,0.12);}
+  .c1 .step-num{background:#7C3AED;color:#fff;}
+
+  .c2{border-color:rgba(59,130,246,0.5);background:rgba(59,130,246,0.08);}
+  .c2 .step-bubble{border-color:rgba(59,130,246,0.6);background:rgba(59,130,246,0.12);}
+  .c2 .step-num{background:#1D4ED8;color:#fff;}
+
+  .c3{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.08);}
+  .c3 .step-bubble{border-color:rgba(245,158,11,0.6);background:rgba(245,158,11,0.12);}
+  .c3 .step-num{background:#D97706;color:#fff;}
+
+  .c4{border-color:rgba(239,68,68,0.5);background:rgba(239,68,68,0.08);}
+  .c4 .step-bubble{border-color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.12);}
+  .c4 .step-num{background:#B91C1C;color:#fff;}
+
+  .c5{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.08);}
+  .c5 .step-bubble{border-color:rgba(16,185,129,0.6);background:rgba(16,185,129,0.12);}
+  .c5 .step-num{background:#047857;color:#fff;}
+
+  .c6{border-color:rgba(99,102,241,0.5);background:rgba(99,102,241,0.08);}
+  .c6 .step-bubble{border-color:rgba(99,102,241,0.6);background:rgba(99,102,241,0.12);}
+  .c6 .step-num{background:#4338CA;color:#fff;}
+
+  .c7{border-color:rgba(236,72,153,0.5);background:rgba(236,72,153,0.08);}
+  .c7 .step-bubble{border-color:rgba(236,72,153,0.6);background:rgba(236,72,153,0.12);}
+  .c7 .step-num{background:#9D174D;color:#fff;}
+
+  /* outcome colours */
+  .oa{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.07);}
+  .oa .ob-grade{color:#34D399;}
+  .ob2{border-color:rgba(59,130,246,0.5);background:rgba(59,130,246,0.07);}
+  .ob2 .ob-grade{color:#60A5FA;}
+  .oc2{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.07);}
+  .oc2 .ob-grade{color:#FBBF24;}
+  .od2{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.06);}
+  .od2 .ob-grade{color:#F87171;}
+
+  .footer{position:relative;z-index:2;text-align:center;margin-top:24px;font-size:10px;color:#374151;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="glow1"></div><div class="glow2"></div>
+
+  <div class="title-block">
+    <div class="title-label">🔄 Process Flow</div>
+    <div class="title-main">How the <span>AI Grading System Works</span></div>
+    <div class="title-sub">From customer return request to automated routing — end to end</div>
+  </div>
+
+  <div class="flow">
+
+    <!-- ═══════════════ TOP ROW: Steps 1-5 ═══════════════ -->
+    <div class="top-row">
+
+      <!-- Step 1 -->
+      <div class="step">
+        <div class="step-bubble c1" style="border-color:rgba(139,92,246,0.6);background:rgba(139,92,246,0.12)">
+          📦<div class="step-num" style="background:#7C3AED;color:#fff">1</div>
+        </div>
+        <div class="step-name">Customer Initiates Return</div>
+        <div class="step-detail">Selects item, reason & category in the Returns Portal</div>
+      </div>
+
+      <div class="h-arrow">
+        <div class="h-line"></div>
+        <div class="h-alabel">Web App</div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step">
+        <div class="step-bubble" style="border-color:rgba(59,130,246,0.6);background:rgba(59,130,246,0.12)">
+          📸<div class="step-num" style="background:#1D4ED8;color:#fff">2</div>
+        </div>
+        <div class="step-name">Upload Multi-Angle Photos</div>
+        <div class="step-detail">Guided wizard: Front, Back, Left, Right, Top, Bottom views</div>
+      </div>
+
+      <div class="h-arrow">
+        <div class="h-line"></div>
+        <div class="h-alabel">HTTPS</div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step">
+        <div class="step-bubble" style="border-color:rgba(245,158,11,0.6);background:rgba(245,158,11,0.12)">
+          🔍<div class="step-num" style="background:#D97706;color:#fff">3</div>
+        </div>
+        <div class="step-name">Photo Quality Check</div>
+        <div class="step-detail">Auto-detect blur, low brightness, duplicates, wrong views</div>
+      </div>
+
+      <div class="h-arrow">
+        <div class="h-line"></div>
+        <div class="h-alabel">PASS ✓</div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step">
+        <div class="step-bubble" style="border-color:rgba(16,185,129,0.6);background:rgba(16,185,129,0.12)">
+          ☁️<div class="step-num" style="background:#047857;color:#fff">4</div>
+        </div>
+        <div class="step-name">Upload to Cloud</div>
+        <div class="step-detail">Photos saved to AWS S3 · State created in DynamoDB</div>
+      </div>
+
+      <div class="h-arrow">
+        <div class="h-line"></div>
+        <div class="h-alabel">Async</div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step">
+        <div class="step-bubble" style="border-color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.12)">
+          🧠<div class="step-num" style="background:#B91C1C;color:#fff">5</div>
+        </div>
+        <div class="step-name">AI Vision Analysis</div>
+        <div class="step-detail">YOLO11 detects defects · Moondream2 verifies identity</div>
+      </div>
+
+      <div class="h-arrow">
+        <div class="h-line"></div>
+        <div class="h-alabel">Result</div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step">
+        <div class="step-bubble" style="border-color:rgba(99,102,241,0.6);background:rgba(99,102,241,0.12)">
+          📊<div class="step-num" style="background:#4338CA;color:#fff">6</div>
+        </div>
+        <div class="step-name">Compute Grade</div>
+        <div class="step-detail">3-run voting merge · Band-edge detection · A+ → F score</div>
+      </div>
+
+    </div><!-- /top-row -->
+
+    <!-- ── Vertical down arrow from Step 3 (Quality Check) → FAIL branch ── -->
+    <!-- ── AND from Step 6 → Routing Outcomes ── -->
+
+    <!-- Row 2: FAIL branch under step 3 + pass continues + Routing under step 6 -->
+    <div style="display:flex;align-items:flex-start;justify-content:center;margin-top:10px;position:relative">
+
+      <!-- Spacer to align with step 3 center -->
+      <!-- Steps 1+2 = 2*(172+32) = 408px, step3 center = 408+86 = 494px from left -->
+      <!-- We do it with flex approach -->
+
+      <!-- Under step 1 & 2: just spacer -->
+      <div style="width:172px;flex-shrink:0"></div>
+      <div style="width:32px;flex-shrink:0"></div>
+      <div style="width:172px;flex-shrink:0"></div>
+      <div style="width:32px;flex-shrink:0"></div>
+
+      <!-- Under step 3: FAIL branch goes down-left -->
+      <div style="width:172px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
+        <!-- Down arrow -->
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div style="width:2.5px;height:22px;background:linear-gradient(180deg,rgba(239,68,68,0.6),rgba(239,68,68,0.3))"></div>
+          <div style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(239,68,68,0.6)"></div>
+        </div>
+        <!-- FAIL box -->
+        <div class="fail-box" style="margin-top:8px;width:160px">
+          <div class="fail-box-icon">❌</div>
+          <div class="fail-box-title">Quality Failed</div>
+          <div class="fail-box-desc">Customer is notified with specific reason to retake photos</div>
+        </div>
+      </div>
+
+      <!-- Spacer step 3→4 arrow -->
+      <div style="width:32px;flex-shrink:0"></div>
+
+      <!-- Under step 4: empty -->
+      <div style="width:172px;flex-shrink:0"></div>
+      <div style="width:32px;flex-shrink:0"></div>
+
+      <!-- Under step 6: routing outcomes header -->
+      <div style="width:172px;flex-shrink:0;display:flex;flex-direction:column;align-items:center">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div style="width:2.5px;height:22px;background:linear-gradient(180deg,rgba(16,185,129,0.6),rgba(16,185,129,0.3))"></div>
+          <div style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(16,185,129,0.6)"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Routing Outcomes row ── -->
+    <!-- We use absolute positioning offset to align under step 6 area but centered below step 4-6 -->
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <div style="display:flex;gap:12px;width:calc(3*172px + 2*32px + 32px);">
+        <div class="outcome-box oa">
+          <div class="ob-icon">✅</div>
+          <div class="ob-grade">A+ / A</div>
+          <div class="ob-label" style="color:#34D399">Restock</div>
+          <div class="ob-desc">Perfect condition — back to Amazon inventory at full price</div>
+        </div>
+        <div class="outcome-box ob2">
+          <div class="ob-icon">🔧</div>
+          <div class="ob-grade">B / C</div>
+          <div class="ob-label" style="color:#60A5FA">Refurbish</div>
+          <div class="ob-desc">Moderate damage — sent to repair centre for restoration</div>
+        </div>
+        <div class="outcome-box oc2">
+          <div class="ob-icon">🛒</div>
+          <div class="ob-grade">D</div>
+          <div class="ob-label" style="color:#FBBF24">P2P Resale</div>
+          <div class="ob-desc">Significant wear — listed on MarketConnect at discount</div>
+        </div>
+        <div class="outcome-box od2">
+          <div class="ob-icon">💚</div>
+          <div class="ob-grade">F</div>
+          <div class="ob-label" style="color:#F87171">NGO Donate</div>
+          <div class="ob-desc">Beyond resale value — donated via MarketConnect Cares</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Key process callouts ── -->
+    <div style="display:flex;gap:12px;margin-top:20px;position:relative;z-index:2">
+
+      <div style="flex:1;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:20px;flex-shrink:0">⚡</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#818CF8;margin-bottom:3px">Circuit Breaker Fallback</div>
+          <div style="font-size:9.5px;color:#64748B;line-height:1.5">If Python AI engine fails → auto-switches to Google Gemini Flash → Gemma 4. Zero downtime for users.</div>
+        </div>
+      </div>
+
+      <div style="flex:1;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:20px;flex-shrink:0">🗳️</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#34D399;margin-bottom:3px">3-Run Voting System</div>
+          <div style="font-size:9.5px;color:#64748B;line-height:1.5">Each item is graded 3 times. Defects only count if found in ≥2 runs — dramatically reduces false positives.</div>
+        </div>
+      </div>
+
+      <div style="flex:1;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:20px;flex-shrink:0">🛡️</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#F87171;margin-bottom:3px">Fraud Detection</div>
+          <div style="font-size:9.5px;color:#64748B;line-height:1.5">Moondream2 VLM verifies the item matches the claimed category. Mismatches are flagged and blocked instantly.</div>
+        </div>
+      </div>
+
+      <div style="flex:1;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:20px;flex-shrink:0">🔄</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#FBBF24;margin-bottom:3px">Circular Economy</div>
+          <div style="font-size:9.5px;color:#64748B;line-height:1.5">Every returned item is routed — nothing wasted. Restock, Refurbish, Resell (P2P) or Donate to NGOs.</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /flow -->
+
+  <div class="footer">Amazon Returns &amp; AI Vision Grading Platform &nbsp;·&nbsp; Amazon HackOn 2025</div>
+</div>
+</body>
+</html>

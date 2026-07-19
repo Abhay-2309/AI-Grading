@@ -68,7 +68,7 @@ function getRequiredFields(category, subcategory, subcategoryTaxonomy) {
 }
 
 const POLL_INTERVAL_MS = 2500;
-const MAX_POLLS = 100; // ~250s ceiling — covers the rare band-edge re-run (N=1 -> N=3) on CPU-only inference, while staying under AI1's 300s stuck-request sweeper
+const MAX_POLLS = 360; // ~900s ceiling — CPU-only inference measured at ~158s/view, serialized per view on the Python engine; matches AI1's 900s stuck-request sweeper
 
 export default function GuidedPhotoCapture({ activeReturn, returnState, setReturnState, subcategoryTaxonomy, onNext, onBack }) {
   const { fields: requiredViews, labels: viewLabelOverrides } = getRequiredFields(

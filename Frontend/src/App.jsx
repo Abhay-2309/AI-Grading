@@ -61,6 +61,7 @@ export default function App() {
     p2pProducts,
     p2pChats,
     addP2PProduct,
+    refreshP2PProduct,
     revealSellerPhone,
     sendP2PMessage,
     startP2PChat,
@@ -1273,6 +1274,7 @@ export default function App() {
           {p2pPage === 'sell' && (
             <P2PMarketSellItem
               onAddProduct={addP2PProduct}
+              onProductGraded={refreshP2PProduct}
               userLocation={userLocation}
               onDetectLocation={detectUserLocation}
               greenCredits={greenCredits}

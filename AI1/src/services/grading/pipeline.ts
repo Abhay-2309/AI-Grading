@@ -27,7 +27,18 @@ export interface RunSingleDetectionPassResult {
 }
 
 /**
- * Runs a single detection pass across all views concurrently using Promise.allSettled.
+ * Runs a single detection pass across all views, one view at a time.
+ *
+ * This *must* stay sequential rather than concurrent (e.g. Promise.allSettled):
+ * the Python engine runs model inference synchronously inside its async route
+ * handlers, which blocks its single event loop for the whole ~158s/view — so
+ * concurrently-fired requests don't run in parallel there anyway, they just
+ * queue up behind whichever view got there first. But each request's own
+ * timeout clock (customDispatcher / MODEL_TIMEOUT_MS) starts counting the
+ * instant it's *sent*, not when the engine actually starts working on it, so
+ * a view queued behind others would get killed by its own timeout before the
+ * engine ever got to it. Sending one at a time means a view's timeout clock
+ * only starts once it's actually next in line.
  */
 async function runSingleDetectionPass(
   requestId: string,
@@ -36,19 +47,22 @@ async function runSingleDetectionPass(
   customerNotes: string,
   images: GradingImageInput[]
 ): Promise<RunSingleDetectionPassResult> {
-  const settled = await Promise.allSettled(
-    images.map(async (img, idx) => {
-      if (idx > 0) await new Promise((resolve) => setTimeout(resolve, idx * 300));
-      const input: SingleViewDetectionInput = {
-        requestId,
-        category,
-        returnReason,
-        customerNotes,
-        image: img,
-      };
-      return orchestrator.detectSingleView(input);
-    })
-  );
+  const settled: PromiseSettledResult<Awaited<ReturnType<typeof orchestrator.detectSingleView>>>[] = [];
+  for (const img of images) {
+    const input: SingleViewDetectionInput = {
+      requestId,
+      category,
+      returnReason,
+      customerNotes,
+      image: img,
+    };
+    try {
+      const value = await orchestrator.detectSingleView(input);
+      settled.push({ status: 'fulfilled', value });
+    } catch (reason) {
+      settled.push({ status: 'rejected', reason });
+    }
+  }
 
   const damages: DetectedDamage[] = [];
   const failedViews: string[] = [];

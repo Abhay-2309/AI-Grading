@@ -10,6 +10,7 @@ from routing import normalize_category
 # so we can use the literal @spaces.GPU decorator to pass Hugging Face's regex startup check.
 try:
     import spaces
+    IS_ZEROGPU = True
     print("ZeroGPU environment detected, using @spaces.GPU wrapper.")
 except ImportError:
     import sys
@@ -20,6 +21,7 @@ except ImportError:
     mock_spaces.GPU = mock_gpu
     sys.modules['spaces'] = mock_spaces
     import spaces
+    IS_ZEROGPU = False
     print("Standard environment detected, mocked 'spaces' for compatibility.")
 
 # Global Model References
@@ -37,21 +39,26 @@ DETECTION_MAP = {
                     "clothes", "sweater", "hoodie", "kurta", "saree"],
     "HomeGoods":   ["mixer", "blender", "kettle", "iron", "vacuum", "appliance", "fan"],
     "Electronics": ["headphone", "earbud", "speaker", "watch", "smartwatch", "camera"],
-    "Books":       ["book", "novel", "textbook"]
+    "Books":       ["book", "novel", "textbook"],
+    "Toys":        ["toy", "toys", "doll", "action figure", "lego", "game", "block"],
+    "Sports":      ["ball", "bat", "racket", "racquet", "helmet", "glove", "equipment"],
+    "Accessories": ["bag", "handbag", "backpack", "purse", "tote", "wallet"],
+    # "Other" is the catch-all bucket for items with no defined taxonomy leaf —
+    # there's no reliable keyword set to check an arbitrary item against, so an
+    # empty list here is treated as "skip keyword verification" below.
+    "Other":       [],
 }
 
 def get_inference_device():
-    # If spaces is loaded and running on Hugging Face ZeroGPU, we use cuda.
-    # Otherwise, detect local GPU/MPS.
-    try:
-        import spaces
+    # If running on real Hugging Face ZeroGPU, we use cuda.
+    # Otherwise, detect local GPU/MPS, falling back to CPU.
+    if IS_ZEROGPU:
         return "cuda"
-    except ImportError:
-        if torch.backends.mps.is_available():
-            return "mps"
-        elif torch.cuda.is_available():
-            return "cuda"
-        return "cpu"
+    if torch.backends.mps.is_available():
+        return "mps"
+    elif torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
 
 def initialize_models():
     """
@@ -197,15 +204,14 @@ def verify_category_match(image: Image.Image, claimed_category: str) -> dict:
     ).strip().lower()
 
     # Move back to CPU if we are in ZeroGPU to release resource locks
-    try:
-        import spaces
+    if IS_ZEROGPU:
         moondream_model = moondream_model.to("cpu")
-    except ImportError:
-        pass
 
     # Keyword matching in Python — NOT in the AI model
     keywords = DETECTION_MAP.get(norm_claimed, [norm_claimed.lower()])
-    verified = any(kw in detected_raw for kw in keywords)
+    # A category with no keywords (e.g. "Other") has nothing reliable to check
+    # against — treat it as auto-verified rather than always flagging a mismatch.
+    verified = True if not keywords else any(kw in detected_raw for kw in keywords)
 
     return {
         "claimed": norm_claimed,
@@ -312,13 +318,10 @@ def extract_structural_features(image: Image.Image) -> Dict[str, Any]:
             })
 
     # Move models back to CPU to release GPU resource lock
-    try:
-        import spaces
+    if IS_ZEROGPU:
         yolo_model = yolo_model.to("cpu")
         if moondream_model is not None:
             moondream_model = moondream_model.to("cpu")
-    except ImportError:
-        pass
 
     return {
         "defect_counts": defect_counts,   # e.g. {"crack": 1, "dent": 0, ...}
@@ -387,10 +390,7 @@ def extract_semantic_features(image: Image.Image, category: str) -> Dict[str, bo
         )
 
     # Move model back to CPU to release GPU resource lock
-    try:
-        import spaces
+    if IS_ZEROGPU:
         moondream_model = moondream_model.to("cpu")
-    except ImportError:
-        pass
 
     return flags
